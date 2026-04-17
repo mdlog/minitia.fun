@@ -1,0 +1,12 @@
+{
+  "project_name": "Minitia.fun",
+  "repo_url": "https://github.com/initia-labs/minitia-fun",
+  "commit_sha": "0000000000000000000000000000000000000000",
+  "rollup_chain_id": "minitia-fun-test-1",
+  "deployed_address": "0x000000000000000000000000000000000000dEaD",
+  "vm": "move",
+  "native_feature": "auto-signing",
+  "core_logic_path": "contracts/sources/token_factory.move",
+  "native_feature_frontend_path": "src/providers/Web3Providers.tsx",
+  "demo_video_url": "https://youtu.be/placeholder"
+}

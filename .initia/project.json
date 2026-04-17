@@ -1,0 +1,156 @@
+{
+  "$schema": "https://docs.initia.xyz/hackathon/submission.schema.json",
+  "hackathon": {
+    "name": "INITIATE: The Initia Hackathon — Season 1",
+    "track": "defi",
+    "season": 1
+  },
+  "project": {
+    "name": "Minitia.fun",
+    "tagline": "Instant Appchain Launcher — launch anything, graduate fast.",
+    "summary": "Fair-launch appchain launcher on Initia. Mint a token in seconds, trade on a 100ms-block bonding curve, graduate liquidity to InitiaDEX, and promote the community into its own sovereign L2 rollup — all from one cockpit.",
+    "pointOfView": "Pump.fun proved the market for instant-launch token economies but graduation ends at a DEX. On Initia, graduation is just the beginning — successful communities fork into their own sovereign L2 with custom execution and fee economics. Launch-to-sovereignty in a single product.",
+    "website": "https://minitia.fun",
+    "repository": "https://github.com/initia-labs/minitia-fun",
+    "demoVideo": "https://example.com/demo.mp4",
+    "readme": "./README.md",
+    "demoScript": "./.initia/demo.md"
+  },
+  "rollup": {
+    "chainId": "minitia-fun-test-1",
+    "vm": "move",
+    "denom": "umin",
+    "blockTimeMs": 100,
+    "targetTps": 10000,
+    "settlementLayer": "initiation-2",
+    "modules": [
+      {
+        "name": "token_factory",
+        "description": "Mints a new Move object-metadata token with canonical identity (ticker.fun.init)."
+      },
+      {
+        "name": "bonding_curve",
+        "description": "On-chain supply-based pricing with 0.5% trading fee retained to the appchain."
+      },
+      {
+        "name": "liquidity_migrator",
+        "description": "Automates migration to InitiaDEX on L1 via OPinit Bots when graduation threshold is reached."
+      }
+    ],
+    "proof": {
+      "testnetChainId": "initiation-2",
+      "txSubmissionNote": "Deploy Token button uses useInterwovenKit().requestTxBlock to submit a real MsgSend tx on initiation-2 as proof-of-pipeline; tx hash is displayed in-app and links to scan.testnet.initia.xyz."
+    }
+  },
+  "initiaNativeFeatures": {
+    "interwovenKit": {
+      "enabled": true,
+      "package": "@initia/interwovenkit-react@2.6.0",
+      "surfaces": [
+        "src/providers/Web3Providers.tsx",
+        "src/hooks/useInitiaAccount.ts",
+        "src/components/layout/WalletPill.tsx"
+      ]
+    },
+    "autoSign": {
+      "enabled": true,
+      "messageTypes": ["/initia.move.v1.MsgExecute"],
+      "config": "Web3Providers passes enableAutoSign policy: { [chainId]: ['/initia.move.v1.MsgExecute'] }",
+      "uxEffect": "Buy/Sell on Trade page executes without wallet popups after first session-key grant."
+    },
+    "interwovenBridge": {
+      "enabled": true,
+      "surface": "src/components/layout/BridgePill.tsx",
+      "hook": "useInterwovenKit().openBridge()",
+      "uxEffect": "Users deposit from Ethereum, Solana, or any supported chain in one step."
+    },
+    "usernames": {
+      "enabled": true,
+      "pattern": "{ticker}.fun.init",
+      "surfaces": [
+        "src/pages/Launchpad.tsx (subdomain preview)",
+        "src/components/layout/WalletPill.tsx (shows @username when resolved via useInterwovenKit())"
+      ]
+    }
+  },
+  "economicFlywheel": {
+    "launchFee": "Small INIT fee per token → protocol revenue",
+    "tradingFeeBps": 50,
+    "tradingFeeNote": "0.5% retained 100% to the Minitia.fun appchain",
+    "graduationThresholdInit": 5000,
+    "graduationDestination": "InitiaDEX on L1",
+    "enshrinedLiquidity": "Graduated tokens become L1 staking-eligible for network-security rewards.",
+    "vipRewards": "Eligible for esINIT distribution every 2 weeks; redistributed to active traders as loyalty incentive."
+  },
+  "marketUnderstanding": {
+    "targetUsers": [
+      "Degen token launchers (fair-launch memecoin culture)",
+      "Memecoin community founders seeking L2 graduation upside",
+      "DeFi protocol founders who want a Move L2 without infra cost"
+    ],
+    "competitors": [
+      {
+        "name": "Pump.fun",
+        "chain": "Solana",
+        "ourEdge": "Graduation continues into a sovereign L2 rollup — they stop at Raydium."
+      },
+      {
+        "name": "Virtuals",
+        "chain": "Base",
+        "ourEdge": "Category-agnostic (any token, not only AI agents)."
+      },
+      {
+        "name": "Believe",
+        "chain": "Solana",
+        "ourEdge": "Move VM asset safety + Interwoven Bridge onboarding across all chains."
+      },
+      {
+        "name": "Base memecoin apps",
+        "chain": "Base",
+        "ourEdge": "100ms blocks vs 2s, native cross-chain deposit, no bridge friction."
+      }
+    ],
+    "distributionLevers": [
+      "X algorithmic reach via fair-launch transaction firehose",
+      "Telegram alpha channels for new-token notifications",
+      "Cross-chain deposits open onboarding from any ecosystem",
+      "Graduated-token success stories as case studies"
+    ],
+    "successMetrics": {
+      "month1TestnetLaunches": 1000,
+      "month3Graduations": 10,
+      "month6ActiveTradersDAU": 5000,
+      "month6VIPesINITDistributedUSD": 50000
+    }
+  },
+  "milestones": {
+    "phase1Testnet": "Full UI + InterwovenKit + AutoSign + Bridge + Usernames + real MsgSend tx on initiation-2 (this submission).",
+    "phase2DemoDay": "Move modules deployed on minitia-fun-test-1 rollup; end-to-end token_factory mint + bonding_curve buy via session keys.",
+    "phase3Mainnet": "Sovereign Minitia spawn for graduated communities, OPinit liquidity migration, VIP esINIT redistribution."
+  },
+  "techStack": {
+    "frontend": "Vite 5 + React 19 + TypeScript strict",
+    "styling": "Tailwind CSS 3 with custom Sovereign Velocity design tokens",
+    "typography": "Instrument Serif (display) + Bricolage Grotesque (UI) + JetBrains Mono (data)",
+    "web3": "@initia/interwovenkit-react + wagmi v2 + viem + @tanstack/react-query v5",
+    "router": "react-router-dom v7"
+  },
+  "team": [
+    {
+      "role": "Full-stack / Design / Protocol",
+      "handle": "@minitia-fun",
+      "contact": ""
+    }
+  ],
+  "complianceChecklist": {
+    "trackDefi": true,
+    "interwovenKitIntegrated": true,
+    "atLeastOneNativeFeature": true,
+    "allThreeNativeFeaturesIntegrated": true,
+    "submissionJson": true,
+    "readme": true,
+    "demoVideo": "See .initia/demo.md for production-ready script; video file to be attached with final submission.",
+    "rollupChainIdDeclared": true,
+    "onChainProof": "Real tx submitted on initiation-2 via requestTxBlock on Launchpad Deploy action."
+  }
+}

@@ -1,0 +1,22 @@
+node_modules
+dist
+dist-ssr
+.DS_Store
+*.local
+.vite
+.env
+.env.local
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Editor
+.idea
+.vscode
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+Thumbs.db

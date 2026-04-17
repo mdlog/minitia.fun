@@ -1,0 +1,80 @@
+/* =========================================================================
+ * Professional Institutional UI — Design Tokens
+ * ========================================================================= */
+
+:root {
+  /* ---- Surface (Slate/Navy hierarchy) ---- */
+  --surface: #09090B;
+  --surface-dim: #050505;
+  --surface-bright: #18181B;
+  --surface-container-lowest: #09090B;
+  --surface-container-low: #18181B;
+  --surface-container: #27272A;
+  --surface-container-high: #3F3F46;
+  --surface-container-highest: #52525B;
+
+  /* ---- Primary (Institutional Blue) ---- */
+  --primary: #2563EB;
+  --primary-dim: #1D4ED8;
+  --primary-container: #1E3A8A;
+  --on-primary: #FFFFFF;
+  --on-primary-container: #DBEAFE;
+
+  /* ---- Secondary (Trusted Emerald) ---- */
+  --secondary: #10B981;
+  --secondary-dim: #059669;
+  --secondary-container: #064E3B;
+  --on-secondary: #FFFFFF;
+  --on-secondary-container: #D1FAE5;
+
+  /* ---- Tertiary (Subdued Slate Accent) ---- */
+  --tertiary: #64748B;
+  --tertiary-dim: #475569;
+  --tertiary-container: #1E293B;
+  --on-tertiary: #FFFFFF;
+  --on-tertiary-container: #E2E8F0;
+
+  /* ---- Error (Rose) ---- */
+  --error: #E11D48;
+  --error-container: #4C0519;
+  --on-error: #FFFFFF;
+  --on-error-container: #FFE4E6;
+
+  /* ---- Editorial (Slate Blue info/warning) ---- */
+  --editorial: #3B82F6;
+  --editorial-dim: #2563EB;
+  --editorial-container: #1E3A8A;
+  --editorial-ink: #F1F5F9;
+
+  /* ---- On-surface text ---- */
+  --on-surface: #FAFAFA;
+  --on-surface-variant: #A1A1AA;
+  --on-surface-muted: #71717A;
+
+  /* ---- Outline (for crisp borders) ---- */
+  --outline: #3F3F46;
+  --outline-variant: #27272A;
+
+  /* ---- Signature gradients ---- */
+  --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--primary-dim) 100%);
+  --gradient-hyperglow: linear-gradient(45deg, var(--primary) 0%, var(--secondary) 100%);
+  --gradient-sovereign: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--tertiary) 50%,
+    var(--secondary) 100%
+  );
+
+  /* ---- Elevation (ambient shadows) ---- */
+  --shadow-ambient: 0 10px 24px rgba(0, 0, 0, 0.25);
+  --shadow-ambient-lg: 0 20px 48px rgba(0, 0, 0, 0.4);
+  --shadow-glow-primary: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-glow-secondary: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-glow-tertiary: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  /* ---- Motion ---- */
+  --ease-snappy: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 400ms;
+}

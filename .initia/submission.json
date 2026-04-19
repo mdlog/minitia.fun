@@ -1,7 +1,7 @@
 {
   "project_name": "Minitia.fun",
   "repo_url": "https://github.com/mdlog/minitia.fun",
-  "commit_sha": "8296b8d0992eb65d290329111f93165270caea25",
+  "commit_sha": "17c41576aef275c03bd4938e27dd09002e9ec3c7",
   "rollup_chain_id": "minitia-fun-test-1",
   "deployed_address": "0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80",
   "vm": "move",

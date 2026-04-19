@@ -11,7 +11,7 @@
     "summary": "Fair-launch appchain launcher on Initia. Mint a token in seconds, trade on a 100ms-block bonding curve, graduate liquidity to InitiaDEX, and promote the community into its own sovereign L2 rollup — all from one cockpit.",
     "pointOfView": "Pump.fun proved the market for instant-launch token economies but graduation ends at a DEX. On Initia, graduation is just the beginning — successful communities fork into their own sovereign L2 with custom execution and fee economics. Launch-to-sovereignty in a single product.",
     "website": "https://minitia.fun",
-    "repository": "https://github.com/initia-labs/minitia-fun",
+    "repository": "https://github.com/mdlog/minitia.fun",
     "demoVideo": "https://example.com/demo.mp4",
     "readme": "./README.md",
     "demoScript": "./.initia/demo.md"
@@ -26,20 +26,32 @@
     "modules": [
       {
         "name": "token_factory",
-        "description": "Mints a new Move object-metadata token with canonical identity (ticker.fun.init)."
+        "description": "Registry of fair-launched tokens; records creator, ticker, name, .fun.init subdomain, launch_index. 6 tokens live on-chain as of submission."
       },
       {
         "name": "bonding_curve",
-        "description": "On-chain supply-based pricing with 0.5% trading fee retained to the appchain."
+        "description": "Integral linear-curve pricing (Phase 2: real umin custody via primary_fungible_store vault). 0.5% fee retained to creator. Buy/sell/create_pool/claim_fees entries. Graduation threshold 10 MIN (demo) freezes the curve and unlocks the promotion flow."
+      },
+      {
+        "name": "comments",
+        "description": "Per-ticker public comment wall. Permissionless posts (280-char cap) stored in Table<String, Thread>; CommentPosted events make the feed scannable via tx_search. Social signal layer for each token."
       },
       {
         "name": "liquidity_migrator",
-        "description": "Automates migration to InitiaDEX on L1 via OPinit Bots when graduation threshold is reached."
+        "description": "Coordinates appchain promotion. stage_promotion() (creator-gated) snapshots final reserve/supply and emits PromotionStaged; off-chain promoter daemon consumes the event, spawns a sovereign rollup via scripts/spawn-local.mjs, then creator calls record_rollup() to persist the new chain_id + RPC on-chain. Demonstrated end-to-end for $SPX → spx-fun-1."
       }
     ],
     "proof": {
       "testnetChainId": "initiation-2",
-      "txSubmissionNote": "Deploy Token button uses useInterwovenKit().requestTxBlock to submit a real MsgSend tx on initiation-2 as proof-of-pipeline; tx hash is displayed in-app and links to scan.testnet.initia.xyz."
+      "launcherChainId": "minitia-fun-test-1",
+      "deployedAddress": "0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80",
+      "tokensLive": 6,
+      "spawnedAppchains": 1,
+      "spawnedAppchainIds": ["spx-fun-1"],
+      "graduatedTx": "4817945920CAA912...",
+      "stagePromotionTx": "968F414F5A9662091C077835ED2F26C8572FA28B39BB73546EA6A3CE466D5307",
+      "recordRollupTx": "A4339DF72266E05A5A0FFC3CBD51F9AB899F0270926B190FD4B5807C245C6CDB",
+      "txSubmissionNote": "All state transitions (launch, buy/sell, graduate, stage_promotion, record_rollup) emit events decodable via RPC tx_search. See .initia/PROOF-SPX.md for the full audit trail."
     }
   },
   "initiaNativeFeatures": {
@@ -77,8 +89,9 @@
     "launchFee": "Small INIT fee per token → protocol revenue",
     "tradingFeeBps": 50,
     "tradingFeeNote": "0.5% retained 100% to the Minitia.fun appchain",
-    "graduationThresholdInit": 5000,
-    "graduationDestination": "InitiaDEX on L1",
+    "graduationThresholdInit": 10,
+    "graduationThresholdNote": "Temporary hackathon demo value. Production bumps back to ~5000 MIN; constant lives at bonding_curve.move::GRADUATION_INIT_RESERVE.",
+    "graduationDestination": "Sovereign appchain spawn via liquidity_migrator + scripts/spawn-local.mjs (bootstrapped minimove rollup, creator-seeded genesis)",
     "enshrinedLiquidity": "Graduated tokens become L1 staking-eligible for network-security rewards.",
     "vipRewards": "Eligible for esINIT distribution every 2 weeks; redistributed to active traders as loyalty incentive."
   },
@@ -124,9 +137,10 @@
     }
   },
   "milestones": {
-    "phase1Testnet": "Full UI + InterwovenKit + AutoSign + Bridge + Usernames + real MsgSend tx on initiation-2 (this submission).",
-    "phase2DemoDay": "Move modules deployed on minitia-fun-test-1 rollup; end-to-end token_factory mint + bonding_curve buy via session keys.",
-    "phase3Mainnet": "Sovereign Minitia spawn for graduated communities, OPinit liquidity migration, VIP esINIT redistribution."
+    "phase1Complete": "Full UI + InterwovenKit + AutoSign + Bridge + Usernames. 4 custom Move modules (token_factory, bonding_curve, comments, liquidity_migrator) deployed on minitia-fun-test-1.",
+    "phase2Complete": "Real umin custody. primary_fungible_store vault object holds reserve; buy() pulls umin from trader wallet, sell() + claim_fees() pay out via vault signer. No more synthetic reserve.",
+    "phaseAComplete": "Sovereign appchain promotion end-to-end demonstrated on $SPX. Creator staged via UI (tx 968F414F), off-chain promoter daemon generated genesis config, scripts/spawn-local.mjs bootstrapped spx-fun-1 at localhost:61867, creator recorded the live rollup on-chain (tx A4339DF7). Second chain runs concurrently with main rollup.",
+    "nextSteps": "OPinit bridge integration to initiation-2 L1, InitiaDEX pool auto-seeding on spawned chains, multi-validator decentralization via opchild + challenger."
   },
   "techStack": {
     "frontend": "Vite 5 + React 19 + TypeScript strict",

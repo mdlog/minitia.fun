@@ -76,6 +76,53 @@ config scaffolding + on-chain recording** -- enough to prove the end-to-end
 promotion pipeline is wired, not enough to host a fully-featured appchain
 from day one.
 
+## spawn-local.mjs -- safe sovereign-chain spawner
+
+Use this instead of `weave rollup launch` when you want to avoid:
+
+- Destroying the main bonding-curve rollup at `~/.minitia` (weave wipes it
+  by default regardless of `--minitia-dir`)
+- Interactive L1 deposits for OPinit bridge deploy (costs testnet INIT)
+- Waiting 15+ minutes for the bridge dance
+
+```bash
+# Use the config that the promoter daemon already wrote
+node scripts/spawn-local.mjs SPX
+
+# Or specify a config explicitly
+node scripts/spawn-local.mjs SPX --config /path/to/rollup-spx.json
+
+# Re-run: --force removes the old chain home first
+node scripts/spawn-local.mjs SPX --force
+```
+
+What it does:
+1. `minitiad init` in `~/.minitia-<ticker>` with custom chain_id + denom
+2. Patches `app_state.opchild.params` (admin + bridge_executors) so
+   `genesis validate` passes without a real bridge
+3. Generates a fresh validator key, allocates creator tokens from config,
+   allocates validator stake
+4. `minitiad genesis add-genesis-validator` to seed the opchild validator
+   set (minimove path, not cosmos SDK gentx)
+5. Rewrites ports in `config.toml` + `app.toml` so the new chain doesn't
+   collide with the main rollup (uses port range 20000+hash(chain_id))
+6. Spawns `minitiad start` detached, waits for first block, prints the
+   ready-to-use summary (chain_id, rpc, rest, pid)
+
+Tradeoffs vs `weave`:
+- ✅ Zero risk to existing `~/.minitia`
+- ✅ Zero L1 INIT required
+- ✅ < 2 min per ticker
+- ❌ No OPinit bridge (chain is sovereign-isolated, not interwoven)
+- ❌ No InitiaDEX pre-seed
+- ❌ token_factory/bonding_curve not auto-published on new chain
+
+Verified demo run (2026-04-20):
+- Staged: SPX, tx `968F414F5A9662091C077835ED2F26C8572FA28B39BB73546EA6A3CE466D5307` (h=289608)
+- Spawn: `spx-fun-1` at `http://localhost:61867`, validator `init1fs8cg0d...`
+- Recorded: tx `A4339DF72266E05A5A0FFC3CBD51F9AB899F0270926B190FD4B5807C245C6CDB` (h=297199)
+- Result: `stage_of(SPX)` returns `status=1, rollup_chain_id="spx-fun-1"`
+
 ### Environment variables
 
 | Var | Default | Purpose |

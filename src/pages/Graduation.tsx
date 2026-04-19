@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight, ExternalLink, Flame, GraduationCap, Loader2, Lock, Rocket, Trophy } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -12,7 +12,7 @@ import { useGraduationEvent } from "@/hooks/useGraduationEvent";
 import { useHolderLeaderboard } from "@/hooks/useHolderLeaderboard";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { usePoolState } from "@/hooks/usePoolState";
-import { usePromotionStage, useStagePromotionAction } from "@/hooks/usePromotionStage";
+import { usePromotionStage, useRecordRollupAction, useStagePromotionAction } from "@/hooks/usePromotionStage";
 import { APPCHAIN } from "@/lib/initia";
 
 function formatMin(umin: bigint, digits = 4): string {
@@ -56,6 +56,11 @@ export default function Graduation() {
   const { claim, isPending: isClaiming } = useClaimFeesAction();
   const promotion = usePromotionStage(ticker);
   const { stage: stagePromotion, isPending: isStaging } = useStagePromotionAction();
+  const { record: recordRollup, isPending: isRecording } = useRecordRollupAction();
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [recordChainId, setRecordChainId] = useState(`${ticker.toLowerCase()}-fun-1`);
+  const [recordRpc, setRecordRpc] = useState("http://localhost:26657");
+  const [recordFirstTx, setRecordFirstTx] = useState("genesis");
 
   const tokenMeta = useMemo(
     () => (tokens.data ?? []).find((t) => t.ticker === ticker),
@@ -399,6 +404,79 @@ export default function Graduation() {
                 <span className="text-editorial-ink">{ticker.toLowerCase()}-fun-1</span>
               </span>
             </div>
+
+            {/* Creator can record the live rollup once promoter daemon has spawned it. */}
+            {isCreator && (
+              <div className="mt-2 flex flex-col gap-2 border-t border-amber-400/30 pt-3">
+                {!recordOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setRecordOpen(true)}
+                    className="self-start inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1.5 font-mono text-[0.62rem] uppercase tracking-[0.22em] text-amber-200 hover:bg-amber-400/30 snappy"
+                  >
+                    Rollup ready? Record it <ArrowRight className="h-3 w-3" />
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <label className="flex flex-col gap-1">
+                      <span className="font-mono text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                        chain_id
+                      </span>
+                      <input
+                        value={recordChainId}
+                        onChange={(e) => setRecordChainId(e.target.value)}
+                        className="rounded-lg bg-white/[0.06] px-3 py-1.5 font-mono text-body-sm text-on-surface ghost-border focus:outline-none"
+                        placeholder="spx-fun-1"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="font-mono text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                        rollup_rpc
+                      </span>
+                      <input
+                        value={recordRpc}
+                        onChange={(e) => setRecordRpc(e.target.value)}
+                        className="rounded-lg bg-white/[0.06] px-3 py-1.5 font-mono text-body-sm text-on-surface ghost-border focus:outline-none"
+                        placeholder="http://localhost:26657"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="font-mono text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                        first_block_tx (or "genesis")
+                      </span>
+                      <input
+                        value={recordFirstTx}
+                        onChange={(e) => setRecordFirstTx(e.target.value)}
+                        className="rounded-lg bg-white/[0.06] px-3 py-1.5 font-mono text-body-sm text-on-surface ghost-border focus:outline-none"
+                        placeholder="genesis"
+                      />
+                    </label>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="hyperglow"
+                        leading={
+                          isRecording ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />
+                        }
+                        disabled={isRecording || !recordChainId || !recordRpc || !recordFirstTx}
+                        onClick={async () => {
+                          const ok = await recordRollup(ticker, recordChainId, recordRpc, recordFirstTx);
+                          if (ok) {
+                            setRecordOpen(false);
+                            setTimeout(() => promotion.refetch(), 1500);
+                          }
+                        }}
+                      >
+                        {isRecording ? "Recording…" : "Sign + record"}
+                      </Button>
+                      <Button size="sm" variant="glass" onClick={() => setRecordOpen(false)} disabled={isRecording}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

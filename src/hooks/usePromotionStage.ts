@@ -171,3 +171,83 @@ export function useStagePromotionAction() {
 
   return { stage, isPending };
 }
+
+export function useRecordRollupAction() {
+  const kit = useInterwovenKit();
+  const toast = useToast();
+  const [isPending, setPending] = useState(false);
+
+  const record = useCallback(
+    async (ticker: string, rollupChainId: string, rollupRpc: string, firstBlockTx: string): Promise<boolean> => {
+      if (!APPCHAIN_RPC_AVAILABLE) {
+        toast.push({ tone: "error", title: "Appchain RPC unavailable" });
+        return false;
+      }
+      if (!kit.isConnected || !kit.initiaAddress) {
+        toast.push({ tone: "info", title: "Connect a wallet to continue" });
+        kit.openConnect();
+        return false;
+      }
+      const upper = ticker.toUpperCase();
+      const pendingId = toast.push({
+        tone: "loading",
+        title: `Record ${rollupChainId}`,
+        description: "Signing liquidity_migrator::record_rollup…",
+      });
+      setPending(true);
+      try {
+        const result = await kit.requestTxBlock({
+          chainId: APPCHAIN.chainId,
+          messages: [
+            {
+              typeUrl: MSG_EXECUTE_JSON,
+              value: {
+                sender: kit.initiaAddress,
+                moduleAddress: APPCHAIN.deployedAddress,
+                moduleName: "liquidity_migrator",
+                functionName: "record_rollup",
+                typeArgs: [],
+                args: [
+                  `"${APPCHAIN.deployedAddress}"`,
+                  JSON.stringify(upper),
+                  JSON.stringify(rollupChainId),
+                  JSON.stringify(rollupRpc),
+                  JSON.stringify(firstBlockTx),
+                ],
+              },
+            },
+          ],
+          memo: JSON.stringify({
+            app: "minitia.fun",
+            action: "record_rollup",
+            ticker: upper,
+            rollup_chain_id: rollupChainId,
+            ts: Date.now(),
+          }),
+        });
+        if (result.code !== 0) throw new Error(result.rawLog || `code ${result.code}`);
+        const explorerUrl = `${APPCHAIN.rpc}/tx?hash=0x${result.transactionHash}`;
+        toast.update(pendingId, {
+          tone: "success",
+          title: `${rollupChainId} recorded`,
+          description: `appchain live · height ${result.height}`,
+          link: { href: explorerUrl, label: "View tx" },
+        });
+        return true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        toast.update(pendingId, {
+          tone: "error",
+          title: "Record failed",
+          description: msg.slice(0, 240),
+        });
+        return false;
+      } finally {
+        setPending(false);
+      }
+    },
+    [kit, toast],
+  );
+
+  return { record, isPending };
+}

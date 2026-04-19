@@ -20,3 +20,6 @@ npm-debug.log*
 
 # OS
 Thumbs.db
+
+# Phase A appchain promotion — ephemeral daemon state
+promoter-work/

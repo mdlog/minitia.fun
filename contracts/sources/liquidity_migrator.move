@@ -135,23 +135,27 @@ module minitia_fun::liquidity_migrator {
         });
     }
 
-    /// Admin records the freshly spawned rollup's coordinates. Flips status
-    /// from 0 (staged) to 1 (live). Frontend reads this via stage_of().
+    /// Record the freshly spawned rollup's coordinates. Flips status from
+    /// 0 (staged) to 1 (live). Callable by pool creator (self-service,
+    /// same pattern as stage_promotion) or module admin as ops fallback.
     public entry fun record_rollup(
-        admin: &signer,
+        sender: &signer,
         registry_addr: address,
         ticker: String,
         rollup_chain_id: String,
         rollup_rpc: String,
         first_block_tx: String,
     ) acquires Registry {
-        let admin_addr = signer::address_of(admin);
+        let sender_addr = signer::address_of(sender);
         let registry = borrow_global_mut<Registry>(registry_addr);
-        assert!(registry.admin == admin_addr, error::permission_denied(E_NOT_ADMIN));
         assert!(table::contains(&registry.stages, ticker), error::not_found(E_NOT_STAGED));
 
         let stage = table::borrow_mut(&mut registry.stages, ticker);
         assert!(stage.status == 0, error::invalid_state(E_ALREADY_LIVE));
+        assert!(
+            sender_addr == stage.creator || sender_addr == registry.admin,
+            error::permission_denied(E_NOT_CREATOR)
+        );
         stage.rollup_chain_id = rollup_chain_id;
         stage.rollup_rpc = rollup_rpc;
         stage.first_block_tx = first_block_tx;

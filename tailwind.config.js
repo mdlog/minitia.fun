@@ -109,6 +109,8 @@ export default {
         "rise-in": "riseIn 700ms cubic-bezier(0.2,0.8,0.2,1) both",
         "fade-in": "fadeIn 600ms cubic-bezier(0.2,0.8,0.2,1) both",
         "slow-spin": "slowSpin 24s linear infinite",
+        "flash-up": "flashUp 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "flash-down": "flashDown 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
       },
       keyframes: {
         pulseGlow: {
@@ -134,6 +136,14 @@ export default {
         slowSpin: {
           "0%": { transform: "rotate(0deg)" },
           "100%": { transform: "rotate(360deg)" },
+        },
+        flashUp: {
+          "0%": { color: "#10B981", textShadow: "0 0 24px rgba(16, 185, 129, 0.6)" },
+          "100%": { color: "#F1F5F9", textShadow: "0 0 0 transparent" },
+        },
+        flashDown: {
+          "0%": { color: "#E11D48", textShadow: "0 0 24px rgba(225, 29, 72, 0.55)" },
+          "100%": { color: "#F1F5F9", textShadow: "0 0 0 transparent" },
         },
       },
     },

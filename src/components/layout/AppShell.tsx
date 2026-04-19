@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { GlobalActivityTicker } from "./GlobalActivityTicker";
 import { MobileDock } from "./MobileDock";
 import { Sidebar } from "./Sidebar";
 import { TestnetBanner } from "./TestnetBanner";
@@ -14,6 +15,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex min-w-0 flex-1 flex-col gap-5">
           <TestnetBanner />
+          <div className="sticky top-2 z-30">
+            <GlobalActivityTicker />
+          </div>
           <TopBar />
 
           <main className="flex-1 px-1 md:px-2">

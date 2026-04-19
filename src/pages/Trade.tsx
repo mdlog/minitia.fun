@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, ExternalLink, Info, Loader2, RefreshCcw, Wallet, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink, Flame, Info, Loader2, RefreshCcw, Users, Wallet, Zap } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -104,28 +104,158 @@ export default function Trade() {
 
   const noPool = pool.data && !pool.data.exists;
   const latestHeight = trades.data?.[0]?.height ?? 0;
+  const lastTrade = trades.data?.[0];
+
+  // Price flash: compare current vs previous spot price; toggle flash class.
+  const prevSpotRef = useRef<bigint | null>(null);
+  const [flashTone, setFlashTone] = useState<"up" | "down" | null>(null);
+  useEffect(() => {
+    const spot = pool.data?.spotPrice;
+    if (spot === undefined) return;
+    const prev = prevSpotRef.current;
+    if (prev !== null && spot !== prev) {
+      setFlashTone(spot > prev ? "up" : "down");
+      const t = setTimeout(() => setFlashTone(null), 900);
+      prevSpotRef.current = spot;
+      return () => clearTimeout(t);
+    }
+    prevSpotRef.current = spot;
+  }, [pool.data?.spotPrice]);
+
+  // Social microstats: velocity (trades in last 15 min) + unique traders.
+  const { velocity15m, uniqueTraders, isHot } = useMemo(() => {
+    const list = trades.data ?? [];
+    if (list.length === 0 || latestHeight === 0) {
+      return { velocity15m: 0, uniqueTraders: 0, isHot: false };
+    }
+    // ~1 block/s. 15 min = 900 blocks.
+    const cutoff = latestHeight - 900;
+    const recent = list.filter((t) => t.height >= cutoff);
+    const traders = new Set(list.map((t) => t.trader));
+    return {
+      velocity15m: recent.length,
+      uniqueTraders: traders.size,
+      isHot: recent.length >= 3,
+    };
+  }, [trades.data, latestHeight]);
 
   return (
     <div className="flex flex-col gap-8 pb-6">
-      {/* Header */}
-      <section className="flex flex-wrap items-center gap-5">
-        <Avatar symbol={ticker} size="xl" />
-        <div className="min-w-0 flex-1">
-          <h1 className="flex items-baseline gap-3 text-[clamp(2rem,4.5vw,3.25rem)] leading-[0.95] text-editorial-ink">
-            <span className="font-editorial italic text-editorial">{ticker.toLowerCase()}</span>
-            <span className="font-mono text-title-md font-normal text-on-surface-variant">
-              / MIN
-            </span>
-          </h1>
-          <p className="mt-1.5 font-mono text-body-sm text-on-surface-muted tracking-wide">
-            {APPCHAIN.deployedAddress.slice(0, 10)}…{APPCHAIN.deployedAddress.slice(-6)} · bonding_curve
-          </p>
-        </div>
-        <div className="flex min-w-[260px] flex-col items-end gap-2">
-          <ProgressBar value={graduationProgress} tone="graduation" size="sm" />
-          <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-            {graduationProgress.toFixed(1)}% to graduation · 5,000 MIN
-          </span>
+      {/* Hero — pump.fun-scale ticker + live price */}
+      <section className="relative grain dotgrid rounded-[28px] surface-section overflow-hidden">
+        <div className="relative px-6 py-8 md:px-10 md:py-10">
+          <div className="flex flex-wrap items-start gap-6">
+            <Avatar symbol={ticker} size="xl" className="shrink-0" />
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
+              {/* Massive editorial ticker */}
+              <h1
+                className="flex items-end gap-4 leading-[0.82] text-editorial-ink"
+                style={{ fontSize: "clamp(3.5rem, 11vw, 9rem)" }}
+              >
+                <span className="font-editorial italic text-editorial truncate">
+                  {ticker.toLowerCase()}
+                </span>
+                <span className="pb-3 font-mono text-[clamp(0.9rem,1.2vw,1.1rem)] font-normal uppercase tracking-[0.28em] text-on-surface-muted">
+                  / MIN
+                </span>
+              </h1>
+
+              {/* Microstat badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                {isHot && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-2.5 py-1 font-mono text-[0.62rem] font-medium uppercase tracking-[0.22em] text-amber-300">
+                    <Flame className="h-3 w-3" /> Hot · {velocity15m} trades / 15m
+                  </span>
+                )}
+                {!isHot && velocity15m > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 font-mono text-[0.62rem] font-medium uppercase tracking-[0.22em] text-on-surface-variant">
+                    {velocity15m} trade{velocity15m === 1 ? "" : "s"} / 15m
+                  </span>
+                )}
+                {uniqueTraders > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 font-mono text-[0.62rem] font-medium uppercase tracking-[0.22em] text-on-surface-variant">
+                    <Users className="h-3 w-3" /> {uniqueTraders} trader
+                    {uniqueTraders === 1 ? "" : "s"}
+                  </span>
+                )}
+                <a
+                  href={`${APPCHAIN.rpc}/tx?hash=0x${lastTrade?.hash ?? ""}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 font-mono text-[0.62rem] font-medium uppercase tracking-[0.22em] text-on-surface-variant hover:text-editorial-ink"
+                >
+                  {APPCHAIN.deployedAddress.slice(0, 8)}…{APPCHAIN.deployedAddress.slice(-4)} · bonding_curve
+                </a>
+              </div>
+            </div>
+
+            {/* Live price slab — right rail */}
+            {pool.data?.exists && (
+              <div className="flex shrink-0 flex-col items-end gap-3 lg:min-w-[320px]">
+                <div className="flex flex-col items-end gap-1">
+                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.28em] text-on-surface-muted">
+                    spot · live
+                  </span>
+                  <span
+                    className={cn(
+                      "font-editorial italic text-[clamp(2.5rem,6vw,4.5rem)] leading-none tabular-nums text-editorial-ink",
+                      flashTone === "up" && "animate-flash-up",
+                      flashTone === "down" && "animate-flash-down",
+                    )}
+                  >
+                    {formatMin(pool.data.spotPrice, 6)}
+                  </span>
+                  <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                    MIN / token
+                  </span>
+                </div>
+                <div className="w-full max-w-[320px] flex flex-col gap-1.5">
+                  <ProgressBar value={graduationProgress} tone="graduation" size="sm" />
+                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                    {graduationProgress.toFixed(1)}% to graduation · 5,000 MIN
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Last trade banner */}
+          {lastTrade && (
+            <div className="mt-6 flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.03] px-4 py-2.5 hairline">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[0.58rem] font-medium uppercase tracking-[0.22em]",
+                  lastTrade.side === "BUY"
+                    ? "bg-secondary-container/70 text-secondary"
+                    : "bg-red-500/15 text-red-300",
+                )}
+              >
+                {lastTrade.side === "BUY" ? (
+                  <ArrowUp className="h-3 w-3" />
+                ) : (
+                  <ArrowDown className="h-3 w-3" />
+                )}
+                {lastTrade.side}
+              </span>
+              <span className="font-mono text-body-sm text-on-surface-variant">
+                {shortAddr(lastTrade.trader)}
+              </span>
+              <span className="font-mono text-body-sm text-on-surface-variant">
+                {lastTrade.side === "BUY" ? "bought" : "sold"}
+              </span>
+              <span className="font-mono text-body-sm font-semibold text-on-surface tabular-nums">
+                {Number(lastTrade.tokenAmount).toLocaleString()}
+              </span>
+              <span className="font-editorial italic text-body-sm text-editorial">${ticker}</span>
+              <span className="font-mono text-body-sm text-on-surface-muted">·</span>
+              <span className="font-mono text-body-sm text-on-surface tabular-nums">
+                {formatMin(lastTrade.initAmount, 4)} MIN
+              </span>
+              <span className="ml-auto font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                {relativeTime(lastTrade.height, latestHeight)} · #{lastTrade.height}
+              </span>
+            </div>
+          )}
         </div>
       </section>
 

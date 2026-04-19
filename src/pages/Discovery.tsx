@@ -15,6 +15,7 @@ import {
   type LaunchedToken,
 } from "@/hooks/useAllLaunchedTokens";
 import { APPCHAIN } from "@/lib/initia";
+import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/format";
 
 type FilterKey = "all" | "active" | "graduated" | "no_pool";
@@ -184,7 +185,7 @@ export default function Discovery() {
             </Button>
           </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((t, i) => {
               const status = tokenStatus(t);
               const gradPct = graduationProgress(t.initReserve);
@@ -197,88 +198,135 @@ export default function Discovery() {
               const ctaTone: "primary" | "hyperglow" | "secondary" = t.graduated
                 ? "hyperglow"
                 : "primary";
+              const heat = gradPct >= 50 || t.tradeCount >= 3;
               return (
                 <Card
                   key={t.ticker}
                   tier="base"
                   interactive
-                  padded="md"
-                  className="reveal relative flex h-full flex-col gap-5"
+                  padded={false}
+                  className="reveal group relative flex h-full flex-col overflow-hidden"
                   style={{ ["--d" as string]: `${Math.min(i * 80, 480)}ms` }}
                 >
-                  <GhostNumeral
-                    index={t.launchIndex || i + 1}
-                    className="absolute right-3 top-0 text-[6rem]"
-                  />
-
-                  <div className="flex items-center gap-3">
-                    <Avatar symbol={t.ticker} size="lg" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2">
-                        <span className="truncate font-editorial italic text-[1.6rem] leading-none text-editorial-ink">
-                          {t.ticker.toLowerCase()}
+                  {/* Hero art — giant ticker letter as decorative cover */}
+                  <div className="relative h-32 overflow-hidden bg-gradient-to-br from-editorial/25 via-primary-container/30 to-tertiary-container/30">
+                    <div className="grain absolute inset-0 opacity-40" />
+                    <div className="dotgrid absolute inset-0 opacity-50" />
+                    <span
+                      className="absolute inset-0 flex items-center justify-center font-editorial italic leading-none text-editorial-ink/85 mix-blend-overlay select-none"
+                      style={{ fontSize: "9.5rem" }}
+                    >
+                      {t.ticker.charAt(0).toLowerCase()}
+                    </span>
+                    <div className="absolute left-4 top-4 flex items-center gap-1.5">
+                      <span className="rounded-full bg-surface/80 px-2 py-0.5 font-mono text-[0.58rem] uppercase tracking-[0.24em] text-on-surface backdrop-blur-glass">
+                        #{t.launchIndex || i + 1}
+                      </span>
+                      {heat && !t.graduated && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 font-mono text-[0.58rem] uppercase tracking-[0.22em] text-amber-300 backdrop-blur-glass">
+                          <Flame className="h-3 w-3" /> hot
                         </span>
-                        <span className="font-mono text-label-sm uppercase tracking-widest text-on-surface-muted">
-                          ${t.ticker}
-                        </span>
-                      </div>
-                      <p className="mt-1 truncate text-body-sm text-on-surface-variant">{t.name}</p>
+                      )}
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-body-sm">
-                    <div className="flex flex-col gap-0.5 border-l border-editorial/20 pl-3">
-                      <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                        liquidity
-                      </span>
-                      <span className="font-mono text-on-surface">
-                        {formatInitFromUmin(t.initReserve, 2)} <span className="text-on-surface-muted">MIN</span>
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-0.5 border-l border-editorial/20 pl-3">
-                      <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                        trades
-                      </span>
-                      <span className="font-mono text-on-surface">{formatNumber(t.tradeCount)}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-baseline justify-between">
-                      <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                        graduation
-                      </span>
-                      <span className="font-mono text-body-sm text-on-surface">
-                        {gradPct.toFixed(1)}%
-                      </span>
-                    </div>
-                    <ProgressBar
-                      value={gradPct}
-                      tone={t.graduated ? "graduation" : "primary"}
-                      size="sm"
+                    <GhostNumeral
+                      index={t.launchIndex || i + 1}
+                      className="absolute right-3 bottom-1 text-[4.5rem] opacity-50"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center gap-2">
-                      <Chip tone={status.tone} dense>
-                        {status.label}
-                      </Chip>
-                      <span
-                        className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-on-surface-muted"
-                        title={t.creator}
-                      >
-                        by {shortAddr(t.creator)}
-                      </span>
+                  <div className="flex flex-1 flex-col gap-4 px-5 pb-5 pt-4">
+                    {/* Identity */}
+                    <div className="flex items-start gap-3">
+                      <Avatar symbol={t.ticker} size="md" className="-mt-8 ring-4 ring-surface" />
+                      <div className="min-w-0 flex-1 pt-1">
+                        <div className="flex items-baseline gap-2">
+                          <span className="truncate font-editorial italic text-[1.6rem] leading-none text-editorial-ink">
+                            {t.ticker.toLowerCase()}
+                          </span>
+                          <span className="font-mono text-label-sm uppercase tracking-widest text-on-surface-muted">
+                            ${t.ticker}
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-body-sm text-on-surface-variant">
+                          {t.name}
+                        </p>
+                      </div>
                     </div>
-                    <Button
-                      asChild
-                      variant={ctaTone}
-                      size="sm"
-                      trailing={<ArrowUpRight className="h-3.5 w-3.5" />}
-                    >
-                      <Link to={ctaHref}>{ctaLabel}</Link>
-                    </Button>
+
+                    {/* Stats row */}
+                    <div className="grid grid-cols-3 gap-2 text-body-sm">
+                      <div className="flex flex-col gap-0.5 border-l border-editorial/25 pl-2.5">
+                        <span className="font-mono text-[0.56rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                          liq
+                        </span>
+                        <span className="font-mono tabular-nums text-on-surface">
+                          {formatInitFromUmin(t.initReserve, 2)}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-0.5 border-l border-editorial/25 pl-2.5">
+                        <span className="font-mono text-[0.56rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                          trades
+                        </span>
+                        <span className="font-mono tabular-nums text-on-surface">
+                          {formatNumber(t.tradeCount)}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-0.5 border-l border-editorial/25 pl-2.5">
+                        <span className="font-mono text-[0.56rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                          grad
+                        </span>
+                        <span className="font-mono tabular-nums text-on-surface">
+                          {gradPct.toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Flame gauge — progress bar with burn tone */}
+                    <div className="flex flex-col gap-1">
+                      <div
+                        className="relative h-1.5 overflow-hidden rounded-full bg-white/[0.06]"
+                        aria-label={`Graduation ${gradPct.toFixed(1)}%`}
+                      >
+                        <div
+                          className={cn(
+                            "absolute inset-y-0 left-0 rounded-full transition-all duration-500",
+                            t.graduated
+                              ? "bg-gradient-to-r from-amber-400 via-amber-300 to-amber-200"
+                              : gradPct >= 75
+                                ? "bg-gradient-to-r from-red-400 via-amber-400 to-amber-300"
+                                : gradPct >= 50
+                                  ? "bg-gradient-to-r from-orange-500 to-amber-400"
+                                  : gradPct >= 25
+                                    ? "bg-gradient-to-r from-primary to-tertiary"
+                                    : "bg-gradient-to-r from-editorial to-primary",
+                          )}
+                          style={{ width: `${Math.max(2, gradPct)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="mt-auto flex items-center justify-between pt-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Chip tone={status.tone} dense>
+                          {status.label}
+                        </Chip>
+                        <span
+                          className="truncate font-mono text-[0.6rem] uppercase tracking-[0.2em] text-on-surface-muted"
+                          title={t.creator}
+                        >
+                          by {shortAddr(t.creator)}
+                        </span>
+                      </div>
+                      <Button
+                        asChild
+                        variant={ctaTone}
+                        size="sm"
+                        trailing={<ArrowUpRight className="h-3.5 w-3.5" />}
+                      >
+                        <Link to={ctaHref}>{ctaLabel}</Link>
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               );

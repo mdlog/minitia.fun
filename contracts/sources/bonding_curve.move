@@ -1,18 +1,25 @@
 /// Minitia.fun - bonding_curve
 /// ---------------------------------------------------------------------------
-/// Per-token linear bonding curve with per-holder balance tracking. Phase 1
-/// implementation: state changes are real (verifiable on-chain), but no
-/// actual umin transfers happen yet - the curve uses synthetic INIT reserve
-/// driven by the `init_in` argument. Phase 2 wires real coin transfers via
+/// Per-token linear bonding curve with per-holder balance tracking AND real
+/// umin custody. Every buy() moves umin from trader -> vault, every sell()
+/// and claim_fees() pays out from vault -> receiver via
 /// primary_fungible_store.
+///
+/// Vault = named Object owned by the module admin, accessed via a stored
+/// ExtendRef so the module can mint a signer on demand without requiring the
+/// admin to re-sign.
 module minitia_fun::bonding_curve {
     use std::error;
     use std::signer;
-    use std::string::String;
+    use std::string::{Self, String};
     use std::vector;
 
+    use initia_std::coin;
     use initia_std::event;
+    use initia_std::fungible_asset::Metadata;
     use initia_std::math128;
+    use initia_std::object::{Self, ExtendRef, Object};
+    use initia_std::primary_fungible_store;
     use initia_std::table::{Self, Table};
 
     // ---- Errors ------------------------------------------------------------
@@ -26,6 +33,11 @@ module minitia_fun::bonding_curve {
     const E_INSUFFICIENT_BALANCE: u64 = 8;
     const E_NOT_CREATOR: u64 = 9;
     const E_NO_FEES: u64 = 10;
+    const E_CUSTODY_NOT_INITIALIZED: u64 = 11;
+    const E_AMOUNT_TOO_LARGE: u64 = 12;
+
+    // ---- Seeds -------------------------------------------------------------
+    const VAULT_SEED: vector<u8> = b"minitia_fun::bonding_curve::vault::v1";
 
     // ---- Constants ---------------------------------------------------------
     /// 0.5 percent fee retained to the appchain.
@@ -101,6 +113,13 @@ module minitia_fun::bonding_curve {
         new_reserve: u128,
     }
 
+    /// Stored at the admin address. `extend_ref` lets the module mint the
+    /// vault's signer on demand to pay out umin on sells / fee claims.
+    struct CustodyCap has key {
+        extend_ref: ExtendRef,
+        vault_addr: address,
+    }
+
     // ---- Init --------------------------------------------------------------
 
     public entry fun initialize(owner: &signer) {
@@ -111,6 +130,21 @@ module minitia_fun::bonding_curve {
             pools: table::new<String, Pool>(),
             balances: table::new<HolderKey, u128>(),
         });
+    }
+
+    /// One-shot bootstrap for real umin custody. Idempotent: safe to call by
+    /// whoever owns the Registry exactly once. Creates a named Object whose
+    /// primary fungible store of umin will be the pool's treasury.
+    public entry fun initialize_custody(owner: &signer) {
+        let addr = signer::address_of(owner);
+        assert!(exists<Registry>(addr), error::not_found(E_NOT_INITIALIZED));
+        assert!(!exists<CustodyCap>(addr), error::already_exists(E_ALREADY_INITIALIZED));
+
+        let constructor_ref = object::create_named_object(owner, VAULT_SEED);
+        let vault_addr = object::address_from_constructor_ref(&constructor_ref);
+        let extend_ref = object::generate_extend_ref(&constructor_ref);
+
+        move_to(owner, CustodyCap { extend_ref, vault_addr });
     }
 
     // ---- Entry: pool lifecycle --------------------------------------------
@@ -147,16 +181,23 @@ module minitia_fun::bonding_curve {
 
     // ---- Entry: trading ---------------------------------------------------
 
-    /// Buy tokens by depositing INIT (synthetic, not real coin transfer in Phase 1).
+    /// Buy tokens by depositing real umin from the trader's wallet into the
+    /// pool vault. Phase 2: actual coin custody, no synthetic reserve.
     public entry fun buy(
         trader: &signer,
         registry_addr: address,
         ticker: String,
         init_amount: u64,
         min_tokens_out: u64,
-    ) acquires Registry {
+    ) acquires Registry, CustodyCap {
         assert!(init_amount > 0, error::invalid_argument(E_AMOUNT_ZERO));
+        assert!(exists<CustodyCap>(registry_addr), error::not_found(E_CUSTODY_NOT_INITIALIZED));
         let trader_addr = signer::address_of(trader);
+
+        // Pull umin from trader -> vault BEFORE mutating pool state.
+        let vault_addr = borrow_global<CustodyCap>(registry_addr).vault_addr;
+        primary_fungible_store::transfer(trader, umin_metadata(), vault_addr, init_amount);
+
         let registry = borrow_global_mut<Registry>(registry_addr);
         let pool = table::borrow_mut(&mut registry.pools, ticker);
         assert!(!pool.graduated, error::invalid_state(E_GRADUATED));
@@ -214,15 +255,16 @@ module minitia_fun::bonding_curve {
         };
     }
 
-    /// Sell tokens back to the curve.
+    /// Sell tokens back to the curve, paying out real umin from the vault.
     public entry fun sell(
         trader: &signer,
         registry_addr: address,
         ticker: String,
         token_amount: u64,
         min_init_out: u64,
-    ) acquires Registry {
+    ) acquires Registry, CustodyCap {
         assert!(token_amount > 0, error::invalid_argument(E_AMOUNT_ZERO));
+        assert!(exists<CustodyCap>(registry_addr), error::not_found(E_CUSTODY_NOT_INITIALIZED));
         let trader_addr = signer::address_of(trader);
         let registry = borrow_global_mut<Registry>(registry_addr);
         let pool = table::borrow_mut(&mut registry.pools, ticker);
@@ -235,17 +277,18 @@ module minitia_fun::bonding_curve {
         assert!(burn <= prev, error::invalid_state(E_INSUFFICIENT_BALANCE));
 
         // Integral linear curve (inverse of buy):
-        //     gross = base*burn + slope*burn*(2*s0 - burn)/(2*1_000_000)
-        //           = (2*spot_scaled*burn - slope*burn^2) / (2*1_000_000)
-        // Clamp to pool.init_reserve so we never overdraw -- this protects
-        // existing pools whose supply was inflated by the Phase 1 shortcut
-        // math (reserve < integral implied by current supply).
+        //     gross = (2*spot_scaled*burn - slope*burn^2) / (2*1_000_000)
+        // Clamp to pool.init_reserve so we never overdraw. Protects pools
+        // whose accounting inflated under Phase 1 synthetic math.
         let gross = gross_for_sell(pool, burn);
         if (gross > pool.init_reserve) { gross = pool.init_reserve; };
         let fee = gross * (FEE_BPS as u128) / (BPS_DENOM as u128);
         let net = if (gross > fee) { gross - fee } else { 0 };
         assert!(net >= (min_init_out as u128), error::invalid_state(E_SLIPPAGE));
         assert!(pool.init_reserve >= net, error::invalid_state(E_INSUFFICIENT_BALANCE));
+        // Guard u128 -> u64 cast for the payout. Net fits in u64 for any
+        // realistic pool (u64 max ~ 1.8e19 umin >> any plausible reserve).
+        assert!(net <= (0xFFFFFFFFFFFFFFFFu128), error::invalid_state(E_AMOUNT_TOO_LARGE));
 
         let new_balance = prev - burn;
         *table::borrow_mut(&mut registry.balances, key) = new_balance;
@@ -254,6 +297,18 @@ module minitia_fun::bonding_curve {
         pool.token_supply = pool.token_supply - burn;
         pool.fee_accumulated = pool.fee_accumulated + fee;
         pool.trade_count = pool.trade_count + 1;
+
+        // Drop borrows before loading the custody cap to avoid double-borrow.
+        if (net > 0) {
+            let cap = borrow_global<CustodyCap>(registry_addr);
+            let vault_sig = object::generate_signer_for_extending(&cap.extend_ref);
+            primary_fungible_store::transfer(
+                &vault_sig,
+                umin_metadata(),
+                trader_addr,
+                (net as u64),
+            );
+        };
 
         event::emit(Trade {
             ticker,
@@ -270,15 +325,15 @@ module minitia_fun::bonding_curve {
 
     // ---- Entry: creator rewards -------------------------------------------
 
-    /// Creator claims accumulated trading fees from their pool.
-    /// Phase 1 accounting: resets fee_accumulated to 0 and emits event.
-    /// Phase 2 will wire real umin transfer via primary_fungible_store.
+    /// Creator claims accumulated trading fees from their pool, paid out in
+    /// real umin from the vault.
     public entry fun claim_fees(
         creator: &signer,
         registry_addr: address,
         ticker: String,
-    ) acquires Registry {
+    ) acquires Registry, CustodyCap {
         assert!(exists<Registry>(registry_addr), error::not_found(E_NOT_INITIALIZED));
+        assert!(exists<CustodyCap>(registry_addr), error::not_found(E_CUSTODY_NOT_INITIALIZED));
         let registry = borrow_global_mut<Registry>(registry_addr);
         assert!(table::contains(&registry.pools, ticker), error::not_found(E_POOL_MISSING));
         let pool = table::borrow_mut(&mut registry.pools, ticker);
@@ -288,14 +343,25 @@ module minitia_fun::bonding_curve {
 
         let amount = pool.fee_accumulated;
         assert!(amount > 0, error::invalid_state(E_NO_FEES));
+        assert!(amount <= (0xFFFFFFFFFFFFFFFFu128), error::invalid_state(E_AMOUNT_TOO_LARGE));
 
         pool.fee_accumulated = 0;
+        let new_reserve_snapshot = pool.init_reserve;
+
+        let cap = borrow_global<CustodyCap>(registry_addr);
+        let vault_sig = object::generate_signer_for_extending(&cap.extend_ref);
+        primary_fungible_store::transfer(
+            &vault_sig,
+            umin_metadata(),
+            creator_addr,
+            (amount as u64),
+        );
 
         event::emit(FeesClaimed {
             ticker,
             creator: creator_addr,
             amount,
-            new_reserve: pool.init_reserve,
+            new_reserve: new_reserve_snapshot,
         });
     }
 
@@ -353,11 +419,28 @@ module minitia_fun::bonding_curve {
         pool.fee_accumulated
     }
 
+    #[view]
+    public fun custody_initialized(registry_addr: address): bool {
+        exists<CustodyCap>(registry_addr)
+    }
+
+    #[view]
+    public fun vault_address(registry_addr: address): address acquires CustodyCap {
+        borrow_global<CustodyCap>(registry_addr).vault_addr
+    }
+
     // ---- Internal ----------------------------------------------------------
 
     fun current_price_internal(pool: &Pool): u128 {
         // price (micro-INIT per token) = base + supply * slope / 1_000_000
         pool.base_price + (pool.token_supply * pool.slope) / 1_000_000
+    }
+
+    /// Returns the fungible-asset Metadata object for the rollup's native gas
+    /// denom (umin). Bank denoms are registered under @initia_std as the
+    /// issuer, so the metadata lives at a deterministic address.
+    fun umin_metadata(): Object<Metadata> {
+        coin::denom_to_metadata(string::utf8(b"umin"))
     }
 
     /// Integral linear curve: how many tokens a buyer receives for depositing

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Globe, ImagePlus, Loader2, Rocket, Wallet } from "lucide-react";
+import { CheckCircle2, ExternalLink, Globe, ImagePlus, Loader2, Rocket, Wallet } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -7,8 +7,9 @@ import { Chip } from "@/components/ui/Chip";
 import { Input } from "@/components/ui/Input";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Textarea } from "@/components/ui/Textarea";
-import { useDeployToken } from "@/hooks/useDeployToken";
 import { useInitiaAccount } from "@/hooks/useInitiaAccount";
+import { useRollupLaunchToken, type LaunchTokenResult } from "@/hooks/useRollupLaunchToken";
+import { APPCHAIN, APPCHAIN_RPC_AVAILABLE } from "@/lib/initia";
 
 const DRAFT_KEY = "minitia.launchpad_draft.v1";
 
@@ -35,11 +36,12 @@ function loadDraft(): Draft {
 
 export default function Launchpad() {
   const { isConnected, openConnect } = useInitiaAccount();
-  const { deploy, isPending } = useDeployToken();
+  const { launch, isPending } = useRollupLaunchToken();
   const initial = useMemo(loadDraft, []);
   const [name, setName] = useState(initial.name);
   const [ticker, setTicker] = useState(initial.ticker);
   const [desc, setDesc] = useState(initial.desc);
+  const [lastResult, setLastResult] = useState<LaunchTokenResult | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -53,8 +55,9 @@ export default function Launchpad() {
   }, [name, ticker, desc]);
 
   const onDeploy = async () => {
-    const result = await deploy({ name, ticker, description: desc });
+    const result = await launch({ name, ticker, description: desc });
     if (result) {
+      setLastResult(result);
       try {
         localStorage.removeItem(DRAFT_KEY);
       } catch {
@@ -204,10 +207,14 @@ export default function Launchpad() {
                   isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />
                 }
                 fullWidth
-                disabled={readiness < 80 || isPending}
+                disabled={readiness < 80 || isPending || !APPCHAIN_RPC_AVAILABLE}
                 onClick={onDeploy}
               >
-                {isPending ? "Broadcasting…" : "Deploy Token"}
+                {isPending
+                  ? "Broadcasting…"
+                  : APPCHAIN_RPC_AVAILABLE
+                    ? "Launch on rollup"
+                    : "Rollup RPC not configured"}
               </Button>
             ) : (
               <Button
@@ -217,8 +224,35 @@ export default function Launchpad() {
                 fullWidth
                 onClick={openConnect}
               >
-                Connect wallet to deploy
+                Connect wallet to launch
               </Button>
+            )}
+
+            <div className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+              target: {APPCHAIN.chainId}
+            </div>
+
+            {lastResult && (
+              <div className="rounded-2xl bg-secondary-container/30 ghost-border px-4 py-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-secondary">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em]">
+                    Launched · height {lastResult.height}
+                  </span>
+                </div>
+                <div className="font-editorial italic text-title-md text-editorial-ink break-all">
+                  {lastResult.subdomain}
+                </div>
+                <a
+                  href={lastResult.explorerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 font-mono text-[0.62rem] uppercase tracking-[0.22em] text-secondary hover:text-editorial-ink snappy break-all"
+                >
+                  0x{lastResult.txHash.slice(0, 12)}…{lastResult.txHash.slice(-8)}
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+              </div>
             )}
           </Card>
         </div>

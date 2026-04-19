@@ -135,7 +135,7 @@ All three native features are wired, not just one:
 | Feature | File / Surface | Effect |
 | --- | --- | --- |
 | **InterwovenKit** — `@initia/interwovenkit-react` | [`src/providers/Web3Providers.tsx`](src/providers/Web3Providers.tsx) / [`src/hooks/useInitiaAccount.ts`](src/hooks/useInitiaAccount.ts) | Wallet connect (Keplr / Leap / MetaMask / Privy), unified account state, username resolution |
-| **Auto-sign / Session UX** | `enableAutoSign` policy for `/initia.move.v1.MsgExecute` in `Web3Providers.tsx` | One-click `Buy / Sell` without wallet popups on every trade |
+| **Auto-sign / Session UX** | `enableAutoSign` whitelist for `/initia.move.v1.MsgExecuteJSON` + `MsgExecute` in [`Web3Providers.tsx`](src/providers/Web3Providers.tsx); toggle + expiry countdown in [`AutoSignIndicator.tsx`](src/components/layout/AutoSignIndicator.tsx) | ONE authz grant (works with MetaMask / Keplr / Leap / Privy) → subsequent Buy / Sell / Claim / Stage / Record execute with zero popups until the session expires |
 | **Interwoven Bridge** | [`src/components/layout/BridgePill.tsx`](src/components/layout/BridgePill.tsx) | `openBridge()` → users deposit from any chain in one step |
 | **Initia Usernames (.init)** | [`src/pages/Launchpad.tsx`](src/pages/Launchpad.tsx) · `ticker.fun.init` preview | Every launched token gets a native identity; WalletPill shows `@username` when available |
 

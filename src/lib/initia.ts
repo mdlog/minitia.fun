@@ -145,19 +145,19 @@ export async function fetchAppchainUminBalance(address: string): Promise<bigint>
   }
 }
 
-/** Message types we auto-sign for one-click trading (session keys).
+/** Message types covered by the auto-sign session grant.
  *
- * The frontend actually broadcasts `MsgExecuteJSON` (wallet-agnostic Move
- * calls with JSON-encoded args), so that's the load-bearing entry for Buy /
- * Sell / Create Pool / Claim Fees / Stage / Record. We keep the legacy
- * `MsgExecute` too for any CLI-style tx that still uses BCS args.
+ * The UI broadcasts every Move entry via `MsgExecuteJSON` (Buy / Sell /
+ * Create Pool / Claim Fees / Stage / Record), so that's the primary entry
+ * on the whitelist. Legacy `MsgExecute` stays for BCS-encoded CLI tx.
  *
- * Note: session-key auto-sign is supported by Initia's in-app wallets
- * (Keplr, Leap, Privy embedded). MetaMask doesn't expose a session-key
- * primitive, so MetaMask users will still see a popup per tx regardless of
- * this whitelist. For judges who connect via Keplr / Leap, the first sign
- * opens a long-lived session that covers every subsequent whitelisted
- * MsgExecuteJSON without another popup. */
+ * InterwovenKit v2.6+ implements auto-sign as a **Cosmos SDK authz grant**:
+ * the connected wallet signs ONE authz tx upfront that authorises an
+ * in-memory grantee key to sign the listed msg types for a limited period.
+ * After that grant, Buy / Sell / etc. are signed locally by the grantee --
+ * no wallet popup per trade. This works with ANY wallet InterwovenKit
+ * supports, including MetaMask, because the grant tx is an ordinary signed
+ * message, not a wallet-specific session-key primitive. */
 export const AUTO_SIGN_MSG_TYPES = [
   "/initia.move.v1.MsgExecuteJSON",
   "/initia.move.v1.MsgExecute",

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ExternalLink, Globe, ImagePlus, Loader2, Rocket, Wallet } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, ExternalLink, Globe, ImagePlus, Loader2, Rocket, Trash2, Wallet } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -12,25 +12,28 @@ import { useRollupLaunchToken, type LaunchTokenResult } from "@/hooks/useRollupL
 import { APPCHAIN, APPCHAIN_RPC_AVAILABLE } from "@/lib/initia";
 
 const DRAFT_KEY = "minitia.launchpad_draft.v1";
+const MAX_LOGO_BYTES = 2 * 1024 * 1024; // 2 MB
 
 interface Draft {
   name: string;
   ticker: string;
   desc: string;
+  logo: string;
 }
 
 function loadDraft(): Draft {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return { name: "", ticker: "", desc: "" };
+    if (!raw) return { name: "", ticker: "", desc: "", logo: "" };
     const parsed = JSON.parse(raw);
     return {
       name: typeof parsed.name === "string" ? parsed.name : "",
       ticker: typeof parsed.ticker === "string" ? parsed.ticker : "",
       desc: typeof parsed.desc === "string" ? parsed.desc : "",
+      logo: typeof parsed.logo === "string" ? parsed.logo : "",
     };
   } catch {
-    return { name: "", ticker: "", desc: "" };
+    return { name: "", ticker: "", desc: "", logo: "" };
   }
 }
 
@@ -41,18 +44,52 @@ export default function Launchpad() {
   const [name, setName] = useState(initial.name);
   const [ticker, setTicker] = useState(initial.ticker);
   const [desc, setDesc] = useState(initial.desc);
+  const [logo, setLogo] = useState<string>(initial.logo);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<LaunchTokenResult | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ name, ticker, desc }));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ name, ticker, desc, logo }));
       } catch {
         /* ignore */
       }
     }, 400);
     return () => clearTimeout(t);
-  }, [name, ticker, desc]);
+  }, [name, ticker, desc, logo]);
+
+  const onPickLogo = () => {
+    setLogoError(null);
+    fileRef.current?.click();
+  };
+
+  const onLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking same file later
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Only PNG, JPG, SVG, or WebP are supported.");
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setLogoError("Max 2 MB.");
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+      reader.readAsDataURL(file);
+    });
+    setLogo(dataUrl);
+  };
+
+  const clearLogo = () => {
+    setLogo("");
+    setLogoError(null);
+  };
 
   const onDeploy = async () => {
     const result = await launch({ name, ticker, description: desc });
@@ -66,6 +103,7 @@ export default function Launchpad() {
       setName("");
       setTicker("");
       setDesc("");
+      setLogo("");
     }
   };
 
@@ -100,15 +138,57 @@ export default function Launchpad() {
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card tier="base" padded="lg" className="flex flex-col gap-6">
           <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-            <button
-              type="button"
-              className="group flex aspect-square w-full items-center justify-center rounded-[24px] border border-dashed border-white/12 bg-white/[0.03] snappy transition-all duration-200 hover:border-primary/40 hover:bg-white/[0.05]"
-            >
-              <div className="flex flex-col items-center gap-2 text-on-surface-muted group-hover:text-on-surface">
-                <ImagePlus className="h-10 w-10" />
-                <span className="text-body-sm">Logo</span>
-              </div>
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={onPickLogo}
+                aria-label={logo ? "Replace logo" : "Upload logo"}
+                className="group relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[24px] border border-dashed border-white/12 bg-white/[0.03] snappy transition-all duration-200 hover:border-primary/40 hover:bg-white/[0.05]"
+              >
+                {logo ? (
+                  <>
+                    <img
+                      src={logo}
+                      alt="Token logo"
+                      className="h-full w-full object-cover"
+                      draggable={false}
+                    />
+                    <span className="absolute bottom-2 right-2 rounded-full bg-surface/70 px-2 py-1 font-mono text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant opacity-0 group-hover:opacity-100 snappy">
+                      replace
+                    </span>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-on-surface-muted group-hover:text-on-surface">
+                    <ImagePlus className="h-10 w-10" />
+                    <span className="text-body-sm">Logo</span>
+                    <span className="text-[0.58rem] font-mono uppercase tracking-[0.22em] text-on-surface-muted">
+                      PNG · JPG · SVG · 2 MB max
+                    </span>
+                  </div>
+                )}
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                onChange={onLogoFile}
+                className="hidden"
+                aria-hidden
+              />
+              {logo && (
+                <button
+                  type="button"
+                  onClick={clearLogo}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white/[0.03] py-1.5 font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-variant hover:text-error snappy"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Remove
+                </button>
+              )}
+              {logoError && (
+                <span className="text-body-sm text-error">{logoError}</span>
+              )}
+            </div>
 
             <div className="flex flex-col gap-5">
               <div className="grid gap-5 md:grid-cols-2">
@@ -160,7 +240,16 @@ export default function Launchpad() {
 
             <div className="rounded-[24px] bg-white/[0.03] px-5 py-5">
               <div className="flex items-center gap-4">
-                <Avatar symbol={ticker || "?"} size="lg" />
+                {logo ? (
+                  <img
+                    src={logo}
+                    alt={`${ticker || "token"} logo`}
+                    className="h-14 w-14 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                    draggable={false}
+                  />
+                ) : (
+                  <Avatar symbol={ticker || "?"} size="lg" />
+                )}
                 <div className="min-w-0">
                   <div className="truncate text-title-lg font-display text-on-surface">
                     {name || "Untitled"}

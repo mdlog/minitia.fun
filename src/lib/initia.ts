@@ -145,8 +145,21 @@ export async function fetchAppchainUminBalance(address: string): Promise<bigint>
   }
 }
 
-/** Message types we auto-sign for one-click trading (session keys). */
+/** Message types we auto-sign for one-click trading (session keys).
+ *
+ * The frontend actually broadcasts `MsgExecuteJSON` (wallet-agnostic Move
+ * calls with JSON-encoded args), so that's the load-bearing entry for Buy /
+ * Sell / Create Pool / Claim Fees / Stage / Record. We keep the legacy
+ * `MsgExecute` too for any CLI-style tx that still uses BCS args.
+ *
+ * Note: session-key auto-sign is supported by Initia's in-app wallets
+ * (Keplr, Leap, Privy embedded). MetaMask doesn't expose a session-key
+ * primitive, so MetaMask users will still see a popup per tx regardless of
+ * this whitelist. For judges who connect via Keplr / Leap, the first sign
+ * opens a long-lived session that covers every subsequent whitelisted
+ * MsgExecuteJSON without another popup. */
 export const AUTO_SIGN_MSG_TYPES = [
+  "/initia.move.v1.MsgExecuteJSON",
   "/initia.move.v1.MsgExecute",
 ];
 

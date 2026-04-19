@@ -37,8 +37,11 @@ const queryClient = new QueryClient({
 const baseChainConfig = INITIA_NETWORK === "mainnet" ? MAINNET : TESTNET;
 
 /**
- * Auto-sign config — maps each chainId to the msg-type-urls we want session keys to handle.
- * Per hackathon spec: /initia.move.v1.MsgExecute for one-click trading on our Move rollup.
+ * Auto-sign config — maps each chainId to the msg-type-urls we want session
+ * keys to handle. The whitelist covers `/initia.move.v1.MsgExecuteJSON` (the
+ * real Move entry path for every Buy / Sell / Stage / Record action) plus
+ * the legacy `/initia.move.v1.MsgExecute` for back-compat. See
+ * AUTO_SIGN_MSG_TYPES in @/lib/initia for the rationale.
  */
 const autoSignPolicy: Record<string, string[]> = {
   [INITIA_CHAIN_ID]: AUTO_SIGN_MSG_TYPES,

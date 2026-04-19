@@ -27,18 +27,30 @@ function relativeTime(iso: string): string {
   return `${Math.round(diff / 86_400_000)}d ago`;
 }
 
-const actionTone: Record<MoveTx["action"], "success" | "info" | "warning" | "glow" | "neutral"> = {
+const actionTone: Record<MoveTx["action"], "success" | "info" | "warning" | "glow" | "neutral" | "danger"> = {
   launch: "glow",
-  initialize: "info",
+  create_pool: "info",
+  buy: "success",
+  sell: "danger",
+  claim_fees: "success",
+  comment: "info",
+  graduated: "warning",
   mark_graduated: "warning",
+  initialize: "info",
   deploy: "success",
   other: "neutral",
 };
 
 const actionLabel: Record<MoveTx["action"], string> = {
   launch: "launch",
-  initialize: "init",
+  create_pool: "pool",
+  buy: "buy",
+  sell: "sell",
+  claim_fees: "claim",
+  comment: "comment",
+  graduated: "graduated",
   mark_graduated: "graduated",
+  initialize: "init",
   deploy: "deploy",
   other: "execute",
 };

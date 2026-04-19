@@ -10,6 +10,46 @@ export interface AppchainStats {
   enabled: boolean;
 }
 
+const VIEW_URL = `${APPCHAIN.rest}/initia/move/v1/view/json`;
+
+async function moveView<T>(
+  moduleName: string,
+  functionName: string,
+  args: string[],
+): Promise<T | undefined> {
+  if (!APPCHAIN.rest) return undefined;
+  try {
+    const res = await fetch(VIEW_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        address: APPCHAIN.deployedAddress,
+        module_name: moduleName,
+        function_name: functionName,
+        type_args: [],
+        args,
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return undefined;
+    const json = (await res.json()) as { data?: string };
+    if (!json.data) return undefined;
+    return JSON.parse(json.data) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+async function countTxs(typeUrl: string): Promise<number> {
+  const q = encodeURIComponent(`"message.action='${typeUrl}'"`);
+  const res = await fetch(`${APPCHAIN.rpc}/tx_search?query=${q}&per_page=1`, {
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) return 0;
+  const json = (await res.json()) as { result?: { total_count?: string } };
+  return Number(json.result?.total_count ?? 0);
+}
+
 async function fetchStats(): Promise<AppchainStats> {
   if (!APPCHAIN_RPC_AVAILABLE) {
     return {
@@ -22,36 +62,24 @@ async function fetchStats(): Promise<AppchainStats> {
     };
   }
 
-  // Every MsgExecute against our rollup — initialize + launch + mark_graduated.
-  const execUrl = `${APPCHAIN.rpc}/tx_search?query=${encodeURIComponent(
-    `"message.action='/initia.move.v1.MsgExecute'"`,
-  )}&per_page=100`;
-  const execRes = await fetch(execUrl, { signal: AbortSignal.timeout(6000) });
-  if (!execRes.ok) throw new Error(`rollup tx_search ${execRes.status}`);
-  const execJson = (await execRes.json()) as {
-    result?: { txs?: Array<{ tx_result?: { code?: number; log?: string; events?: unknown[] } }> };
-  };
-  const execTxs = execJson.result?.txs ?? [];
+  // Authoritative count straight from the module registry.
+  const countStr = await moveView<string>("token_factory", "count", [
+    `"${APPCHAIN.deployedAddress}"`,
+  ]);
+  const launchesOnChain = countStr ? Number(countStr) : 0;
 
-  // Filter successful txs only, then classify by function_name event attribute.
-  const successful = execTxs.filter((t) => (t.tx_result?.code ?? 0) === 0);
-  let launches = 0;
-  let inits = 0;
-  for (const t of successful) {
-    const log = t.tx_result?.log ?? "";
-    if (log.includes("launch") || log.includes("TokenLaunched")) launches += 1;
-    else if (log.includes("initialize")) inits += 1;
-  }
-  // If we can't classify from log, fall back to heuristic: first tx = initialize, rest = launches.
-  if (launches === 0 && successful.length > 1) {
-    launches = successful.length - 1;
-    inits = 1;
-  }
+  // Total Move tx volume = classic MsgExecute + the JSON variant (which is
+  // what the UI + most wallets use now). Use tx_search's total_count so we
+  // don't cap at per_page.
+  const [legacyCount, jsonCount] = await Promise.all([
+    countTxs("/initia.move.v1.MsgExecute"),
+    countTxs("/initia.move.v1.MsgExecuteJSON"),
+  ]);
 
   return {
-    launchesOnChain: launches,
-    msgExecuteCount: successful.length,
-    registryInitialized: inits > 0 || successful.length > 0,
+    launchesOnChain,
+    msgExecuteCount: legacyCount + jsonCount,
+    registryInitialized: launchesOnChain > 0 || legacyCount + jsonCount > 0,
     deployedAddress: APPCHAIN.deployedAddress,
     chainId: APPCHAIN.chainId,
     enabled: true,
@@ -59,13 +87,15 @@ async function fetchStats(): Promise<AppchainStats> {
 }
 
 /**
- * Live stats from the Minitia.fun rollup via its public RPC tunnel.
- * Returns enabled=false when no VITE_APPCHAIN_RPC is configured — UI then
- * falls back to mock data.
+ * Live stats from the Minitia.fun rollup. Uses token_factory::count for
+ * the authoritative launch count (the RPC tx_search approach missed every
+ * MsgExecuteJSON-based launch since the UI switched to it). msgExecuteCount
+ * is the sum across both MsgExecute + MsgExecuteJSON via tx_search
+ * total_count so we never truncate.
  */
 export function useAppchainStats(pollMs = 15_000) {
   return useQuery({
-    queryKey: ["appchainStats", APPCHAIN.rpc],
+    queryKey: ["appchainStats", APPCHAIN.rpc, APPCHAIN.rest],
     queryFn: fetchStats,
     refetchInterval: pollMs,
     staleTime: 5_000,

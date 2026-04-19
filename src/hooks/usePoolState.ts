@@ -15,7 +15,7 @@ export interface PoolState {
   spotPrice: bigint;
 }
 
-const VIEW_BASE = "/initia/move/v1/view_function";
+const VIEW_BASE = "/initia/move/v1/view/json";
 
 async function moveView<T = unknown>(
   moduleAddr: string,

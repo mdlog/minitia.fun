@@ -1,5 +1,12 @@
 import { useCallback, useState } from "react";
-import { SigningStargateClient, GasPrice, AminoTypes, type DeliverTxResponse } from "@cosmjs/stargate";
+import {
+  SigningStargateClient,
+  GasPrice,
+  AminoTypes,
+  calculateFee,
+  type DeliverTxResponse,
+  type StdFee,
+} from "@cosmjs/stargate";
 import { Registry } from "@cosmjs/proto-signing";
 import { defaultRegistryTypes } from "@cosmjs/stargate";
 import { MsgExecuteJSON } from "@initia/initia.proto/initia/move/v1/tx";
@@ -139,10 +146,14 @@ export function useRollupLaunchToken() {
           schemaVersion: 1,
         });
 
+        // Skip the auto-simulate path — it 500s for fresh accounts with
+        // pub_key=null on minitia rollups. Use a flat fee that's plenty for
+        // a single MsgExecuteJSON (~250k gas typical).
+        const fee: StdFee = calculateFee(800_000, GasPrice.fromString(`0.15${APPCHAIN.denom}`));
         const result: DeliverTxResponse = await client.signAndBroadcast(
           initiaAddress,
           [msg],
-          "auto",
+          fee,
           memo,
         );
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, ExternalLink, Flame, Info, Loader2, RefreshCcw, Users, Wallet, Zap } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowDown, ArrowUp, ExternalLink, Flame, Info, Loader2, MessageCircle, RefreshCcw, Send, Trophy, Users, Wallet, Zap } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -13,6 +13,8 @@ import { useAppchainFaucet } from "@/hooks/useAppchainFaucet";
 import { usePoolState, useUserHolding } from "@/hooks/usePoolState";
 import { useTradeAction } from "@/hooks/useTradeAction";
 import { useRecentTrades } from "@/hooks/useRecentTrades";
+import { useComments, useCommentPost } from "@/hooks/useComments";
+import { useHolderLeaderboard } from "@/hooks/useHolderLeaderboard";
 import { APPCHAIN } from "@/lib/initia";
 import { cn } from "@/lib/cn";
 
@@ -50,6 +52,10 @@ export default function Trade() {
   const trades = useRecentTrades(ticker, 25);
   const { drip, isPending: isDripping } = useAppchainFaucet();
   const { submit, isPending: isTrading } = useTradeAction();
+  const comments = useComments(ticker, 30);
+  const { post: postComment, isPending: isPosting } = useCommentPost();
+  const holders = useHolderLeaderboard(ticker, 10);
+  const [commentBody, setCommentBody] = useState("");
 
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [amount, setAmount] = useState("0.5");
@@ -237,9 +243,12 @@ export default function Trade() {
                 )}
                 {lastTrade.side}
               </span>
-              <span className="font-mono text-body-sm text-on-surface-variant">
+              <Link
+                to={`/u/${lastTrade.trader}`}
+                className="font-mono text-body-sm text-on-surface-variant hover:text-editorial-ink snappy"
+              >
                 {shortAddr(lastTrade.trader)}
-              </span>
+              </Link>
               <span className="font-mono text-body-sm text-on-surface-variant">
                 {lastTrade.side === "BUY" ? "bought" : "sold"}
               </span>
@@ -357,7 +366,12 @@ export default function Trade() {
                             </Chip>
                           </td>
                           <td className="px-3 py-2.5 font-mono text-body-sm text-on-surface-variant">
-                            {shortAddr(t.trader)}
+                            <Link
+                              to={`/u/${t.trader}`}
+                              className="hover:text-editorial-ink snappy"
+                            >
+                              {shortAddr(t.trader)}
+                            </Link>
                           </td>
                           <td className="px-3 py-2.5 text-right font-mono">
                             {Number(t.tokenAmount).toLocaleString()}
@@ -391,6 +405,179 @@ export default function Trade() {
                   </tbody>
                 </table>
               </div>
+            </Card>
+
+            {/* Holders leaderboard */}
+            <Card tier="base" padded="md" className="flex flex-col gap-4">
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex items-end gap-3">
+                  <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
+                    § leaderboard
+                  </span>
+                  <h2 className="text-headline-sm font-editorial italic text-editorial-ink">
+                    Top holders
+                  </h2>
+                </div>
+                <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                  {holders.data?.length ?? 0} on curve
+                </span>
+              </div>
+              {holders.isLoading ? (
+                <div className="py-6 text-center font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                  Aggregating…
+                </div>
+              ) : !holders.data || holders.data.length === 0 ? (
+                <div className="py-6 text-center text-body-sm text-on-surface-muted">
+                  No holders yet. Be the first trader.
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-editorial/15">
+                  {holders.data.map((h, i) => {
+                    const isFirst = i === 0;
+                    const isPodium = i < 3;
+                    return (
+                      <Link
+                        to={`/u/${h.address.replace(/^0x/, "0x")}`}
+                        key={h.address}
+                        className="group flex items-center gap-3 py-2.5 hover:bg-white/[0.03] snappy -mx-2 px-2 rounded-md"
+                      >
+                        <span
+                          className={cn(
+                            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-[0.7rem] font-semibold",
+                            isFirst
+                              ? "bg-amber-400/25 text-amber-300"
+                              : isPodium
+                                ? "bg-editorial/20 text-editorial"
+                                : "bg-white/[0.04] text-on-surface-variant",
+                          )}
+                        >
+                          {isPodium ? <Trophy className="h-3.5 w-3.5" /> : i + 1}
+                        </span>
+                        <Avatar symbol={h.address.slice(2, 6).toUpperCase()} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-mono text-body-sm text-on-surface">
+                            {shortAddr(h.address)}
+                          </div>
+                          <div className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                            {h.trades} trade{h.trades === 1 ? "" : "s"}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-body-sm text-on-surface tabular-nums">
+                            {Number(h.balance).toLocaleString()}
+                          </div>
+                          <div className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                            ${ticker}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Comments */}
+            <Card tier="base" padded="md" className="flex flex-col gap-4">
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex items-end gap-3">
+                  <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
+                    § feed
+                  </span>
+                  <h2 className="text-headline-sm font-editorial italic text-editorial-ink">
+                    Comments
+                  </h2>
+                </div>
+                <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                  {comments.data?.length ?? 0} on-chain
+                </span>
+              </div>
+              {/* Composer */}
+              <div className="flex flex-col gap-2 rounded-xl bg-white/[0.03] p-3 hairline">
+                <textarea
+                  value={commentBody}
+                  onChange={(e) => setCommentBody(e.target.value.slice(0, 280))}
+                  placeholder={
+                    isConnected
+                      ? `What's your take on $${ticker}?`
+                      : "Connect a wallet to post on-chain"
+                  }
+                  disabled={!isConnected || isPosting}
+                  rows={2}
+                  className="w-full resize-none bg-transparent text-body-md text-on-surface placeholder:text-on-surface-muted focus:outline-none disabled:cursor-not-allowed"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    className={cn(
+                      "font-mono text-[0.6rem] uppercase tracking-[0.2em]",
+                      commentBody.length > 260 ? "text-amber-300" : "text-on-surface-muted",
+                    )}
+                  >
+                    {commentBody.length}/280 · on-chain · immutable
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    leading={isPosting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                    disabled={!isConnected || !commentBody.trim() || isPosting}
+                    onClick={async () => {
+                      const ok = await postComment(ticker, commentBody);
+                      if (ok) {
+                        setCommentBody("");
+                        setTimeout(() => comments.refetch(), 1200);
+                      }
+                    }}
+                  >
+                    {isPosting ? "Posting…" : "Post"}
+                  </Button>
+                </div>
+              </div>
+              {/* Feed */}
+              {comments.isLoading ? (
+                <div className="py-6 text-center font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                  Loading feed…
+                </div>
+              ) : !comments.data || comments.data.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-center">
+                  <MessageCircle className="h-6 w-6 text-on-surface-muted" />
+                  <span className="text-body-sm text-on-surface-muted">
+                    No comments yet. Start the thread.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-editorial/15">
+                  {comments.data.map((c) => (
+                    <div key={`${c.hash}-${c.index}`} className="flex gap-3 py-3">
+                      <Avatar symbol={c.author.slice(2, 6).toUpperCase()} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            to={`/u/${c.author}`}
+                            className="font-mono text-body-sm text-on-surface hover:text-editorial-ink"
+                          >
+                            {shortAddr(c.author)}
+                          </Link>
+                          <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                            · {latestHeight ? relativeTime(c.blockHeight, latestHeight) : `#${c.blockHeight}`}
+                          </span>
+                          <a
+                            href={`${APPCHAIN.rpc}/tx?hash=0x${c.hash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="ml-auto text-on-surface-muted hover:text-secondary"
+                            aria-label="View tx"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-body-md text-on-surface-variant">
+                          {c.body}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
 

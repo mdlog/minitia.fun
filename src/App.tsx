@@ -9,6 +9,7 @@ const Trade = lazy(() => import("@/pages/Trade"));
 const Graduation = lazy(() => import("@/pages/Graduation"));
 const Airdrops = lazy(() => import("@/pages/Airdrops"));
 const Explorer = lazy(() => import("@/pages/Explorer"));
+const UserProfile = lazy(() => import("@/pages/UserProfile"));
 
 function RouteFallback() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/graduation" element={<Navigate to="/graduation/MOVE" replace />} />
           <Route path="/airdrops" element={<Airdrops />} />
           <Route path="/explorer" element={<Explorer />} />
+          <Route path="/u/:address" element={<UserProfile />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

@@ -311,12 +311,13 @@ export default function Discovery() {
                         <Chip tone={status.tone} dense>
                           {status.label}
                         </Chip>
-                        <span
-                          className="truncate font-mono text-[0.6rem] uppercase tracking-[0.2em] text-on-surface-muted"
+                        <Link
+                          to={`/u/${t.creator}`}
+                          className="truncate font-mono text-[0.6rem] uppercase tracking-[0.2em] text-on-surface-muted hover:text-editorial-ink snappy"
                           title={t.creator}
                         >
                           by {shortAddr(t.creator)}
-                        </span>
+                        </Link>
                       </div>
                       <Button
                         asChild

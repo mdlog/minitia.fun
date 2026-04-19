@@ -108,22 +108,29 @@ export function usePoolState(ticker: string, pollMs = 8_000) {
   });
 }
 
-export async function fetchUserHolding(holder: string, ticker: string): Promise<bigint> {
-  if (!APPCHAIN.rest || !holder || !ticker) return 0n;
+/**
+ * Fetch holder balance. `holder` MUST be the 0x-prefixed hex address
+ * (kit.hexAddress) — Move's address type rejects bech32 `init1…` and
+ * the REST view_function returns 500.
+ */
+export async function fetchUserHolding(holderHex: string, ticker: string): Promise<bigint> {
+  if (!APPCHAIN.rest || !holderHex || !ticker) return 0n;
+  if (!holderHex.startsWith("0x")) return 0n;
   const result = await moveView<string>(
     APPCHAIN.deployedAddress,
     "bonding_curve",
     "balance_of",
-    [`"${APPCHAIN.deployedAddress}"`, `"${holder}"`, JSON.stringify(ticker)],
+    [`"${APPCHAIN.deployedAddress}"`, `"${holderHex}"`, JSON.stringify(ticker)],
   );
   return result ? BigInt(result) : 0n;
 }
 
-export function useUserHolding(holder: string | undefined, ticker: string, pollMs = 10_000) {
+export function useUserHolding(holderHex: string | undefined, ticker: string, pollMs = 10_000) {
+  const enabled = APPCHAIN_RPC_AVAILABLE && Boolean(holderHex?.startsWith("0x")) && Boolean(ticker);
   return useQuery({
-    queryKey: ["userHolding", holder, ticker, APPCHAIN.rest],
-    queryFn: () => fetchUserHolding(holder ?? "", ticker),
-    enabled: APPCHAIN_RPC_AVAILABLE && Boolean(holder) && Boolean(ticker),
+    queryKey: ["userHolding", holderHex, ticker, APPCHAIN.rest],
+    queryFn: () => fetchUserHolding(holderHex ?? "", ticker),
+    enabled,
     refetchInterval: pollMs,
     staleTime: 3_000,
     retry: 1,

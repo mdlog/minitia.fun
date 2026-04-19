@@ -26,23 +26,25 @@ interface MoveEvent {
 function parseTrade(eventAttrs: Record<string, string>, hash: string, height: number): TradeEvent | null {
   if (!eventAttrs.type_tag?.includes("::bonding_curve::Trade")) return null;
   const dataStr = eventAttrs.data ?? "{}";
-  let data: Record<string, string> = {};
+  let data: Record<string, unknown> = {};
   try {
-    data = JSON.parse(dataStr) as Record<string, string>;
+    data = JSON.parse(dataStr) as Record<string, unknown>;
   } catch {
     return null;
   }
+  // Move `side: u8` serialises as JSON number (e.g. 0 or 1). Guard for string too.
+  const sideNum = Number(data.side ?? -1);
   return {
     hash,
     height,
-    side: data.side === "0" ? "BUY" : "SELL",
-    trader: data.trader ?? "",
-    ticker: data.ticker ?? "",
-    initAmount: BigInt(data.init_amount ?? "0"),
-    tokenAmount: BigInt(data.token_amount ?? "0"),
-    newSupply: BigInt(data.new_supply ?? "0"),
-    newReserve: BigInt(data.new_reserve ?? "0"),
-    fee: BigInt(data.fee ?? "0"),
+    side: sideNum === 0 ? "BUY" : "SELL",
+    trader: String(data.trader ?? ""),
+    ticker: String(data.ticker ?? ""),
+    initAmount: BigInt(String(data.init_amount ?? "0")),
+    tokenAmount: BigInt(String(data.token_amount ?? "0")),
+    newSupply: BigInt(String(data.new_supply ?? "0")),
+    newReserve: BigInt(String(data.new_reserve ?? "0")),
+    fee: BigInt(String(data.fee ?? "0")),
   };
 }
 

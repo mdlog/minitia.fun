@@ -43,9 +43,9 @@ function relativeTime(height: number, latestHeight: number, blockTimeMs = 1000):
 export default function Trade() {
   const { symbol = "MOVE" } = useParams();
   const ticker = symbol.toUpperCase();
-  const { isConnected, openConnect, initiaAddress } = useInitiaAccount();
+  const { isConnected, openConnect, initiaAddress, hexAddress } = useInitiaAccount();
   const pool = usePoolState(ticker);
-  const holding = useUserHolding(initiaAddress, ticker);
+  const holding = useUserHolding(hexAddress, ticker);
   const wallet = useAppchainBalance(initiaAddress);
   const trades = useRecentTrades(ticker, 25);
   const { drip, isPending: isDripping } = useAppchainFaucet();

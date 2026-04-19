@@ -31,8 +31,10 @@ module minitia_fun::bonding_curve {
     /// 0.5 percent fee retained to the appchain.
     const FEE_BPS: u64 = 50;
     const BPS_DENOM: u64 = 10_000;
-    /// Graduation threshold: 5_000 INIT raised on the curve.
-    const GRADUATION_INIT_RESERVE: u128 = 5_000_000_000;
+    /// Graduation threshold. Hackathon demo value: 10 MIN so testers can
+    /// trigger graduation with a handful of buys. Production should bump
+    /// back to ~5_000 INIT (5_000_000_000 umin).
+    const GRADUATION_INIT_RESERVE: u128 = 10_000_000;
 
     // ---- State -------------------------------------------------------------
 

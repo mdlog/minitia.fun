@@ -31,7 +31,8 @@ interface MoveEvent {
 }
 
 const VIEW_URL = `${APPCHAIN.rest}/initia/move/v1/view/json`;
-const GRADUATION_INIT_RESERVE = 5_000_000_000n; // 5_000 INIT in umin
+/** Mirrors bonding_curve.move const. Hackathon demo value: 10 MIN in umin. */
+const GRADUATION_INIT_RESERVE = 10_000_000n;
 
 async function moveView<T>(
   moduleName: string,

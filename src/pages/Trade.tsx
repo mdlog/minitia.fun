@@ -20,7 +20,8 @@ import { APPCHAIN } from "@/lib/initia";
 import { cn } from "@/lib/cn";
 
 const SLIPPAGE_OPTIONS = [0.5, 1, 1.5, 3] as const;
-const GRADUATION_THRESHOLD_INIT = 5_000_000_000n; // 5,000 MIN in micro-units
+/** Mirrors bonding_curve.move const. Hackathon demo value: 10 MIN in umin. */
+const GRADUATION_THRESHOLD_INIT = 10_000_000n;
 
 function formatMin(microUnits: bigint, digits = 4): string {
   if (microUnits === 0n) return "0.0000";
@@ -258,7 +259,7 @@ export default function Trade() {
                 <div className="w-full max-w-[320px] flex flex-col gap-1.5">
                   <ProgressBar value={graduationProgress} tone="graduation" size="sm" />
                   <span className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                    {graduationProgress.toFixed(1)}% to graduation · 5,000 MIN
+                    {graduationProgress.toFixed(1)}% to graduation · 10 MIN
                   </span>
                 </div>
               </div>

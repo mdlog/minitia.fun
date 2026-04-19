@@ -77,7 +77,7 @@ export const APPCHAIN = {
   blockTimeMs: 100,
   targetTps: 10_000,
   tradingFeeBps: 50, // 0.5%
-  graduationThresholdInit: 5_000,
+  graduationThresholdInit: 10,
   usernameSuffix: ".fun.init",
   modules: ["token_factory", "bonding_curve", "liquidity_migrator"] as const,
   deployedAddress: "0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80",

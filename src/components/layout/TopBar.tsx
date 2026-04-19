@@ -44,11 +44,11 @@ function getPageMeta(pathname: string) {
 
   if (pathname === "/airdrops") {
     return {
-      section: "Rewards",
+      section: "Creator Rewards",
       title: "Claim Center",
       description:
-        "Track active incentives, consolidate rewards, and avoid missed claims.",
-      badge: "Claims Open",
+        "Trading fees from your bonding-curve pools accumulate here. Drain any time.",
+      badge: "Pool Fees",
     };
   }
 

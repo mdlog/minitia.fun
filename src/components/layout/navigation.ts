@@ -49,7 +49,7 @@ export const primaryNav: NavItem[] = [
     to: "/airdrops",
     label: "Rewards",
     shortLabel: "Rewards",
-    description: "Claim community incentives and active drops.",
+    description: "Claim accumulated trading fees on pools you created.",
     icon: Gift,
     activePrefix: "/airdrops",
   },

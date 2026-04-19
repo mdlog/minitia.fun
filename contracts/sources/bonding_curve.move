@@ -23,6 +23,8 @@ module minitia_fun::bonding_curve {
     const E_SLIPPAGE: u64 = 6;
     const E_GRADUATED: u64 = 7;
     const E_INSUFFICIENT_BALANCE: u64 = 8;
+    const E_NOT_CREATOR: u64 = 9;
+    const E_NO_FEES: u64 = 10;
 
     // ---- Constants ---------------------------------------------------------
     /// 0.5 percent fee retained to the appchain.
@@ -86,6 +88,14 @@ module minitia_fun::bonding_curve {
         ticker: String,
         final_reserve: u128,
         final_supply: u128,
+    }
+
+    #[event]
+    struct FeesClaimed has drop, store {
+        ticker: String,
+        creator: address,
+        amount: u128,
+        new_reserve: u128,
     }
 
     // ---- Init --------------------------------------------------------------
@@ -245,6 +255,37 @@ module minitia_fun::bonding_curve {
         });
     }
 
+    // ---- Entry: creator rewards -------------------------------------------
+
+    /// Creator claims accumulated trading fees from their pool.
+    /// Phase 1 accounting: resets fee_accumulated to 0 and emits event.
+    /// Phase 2 will wire real umin transfer via primary_fungible_store.
+    public entry fun claim_fees(
+        creator: &signer,
+        registry_addr: address,
+        ticker: String,
+    ) acquires Registry {
+        assert!(exists<Registry>(registry_addr), error::not_found(E_NOT_INITIALIZED));
+        let registry = borrow_global_mut<Registry>(registry_addr);
+        assert!(table::contains(&registry.pools, ticker), error::not_found(E_POOL_MISSING));
+        let pool = table::borrow_mut(&mut registry.pools, ticker);
+
+        let creator_addr = signer::address_of(creator);
+        assert!(pool.creator == creator_addr, error::permission_denied(E_NOT_CREATOR));
+
+        let amount = pool.fee_accumulated;
+        assert!(amount > 0, error::invalid_state(E_NO_FEES));
+
+        pool.fee_accumulated = 0;
+
+        event::emit(FeesClaimed {
+            ticker,
+            creator: creator_addr,
+            amount,
+            new_reserve: pool.init_reserve,
+        });
+    }
+
     // ---- View functions ----------------------------------------------------
 
     #[view]
@@ -283,6 +324,20 @@ module minitia_fun::bonding_curve {
         if (table::contains(&registry.balances, key)) {
             *table::borrow(&registry.balances, key)
         } else { 0u128 }
+    }
+
+    #[view]
+    public fun creator_of(registry_addr: address, ticker: String): address acquires Registry {
+        let registry = borrow_global<Registry>(registry_addr);
+        let pool = table::borrow(&registry.pools, ticker);
+        pool.creator
+    }
+
+    #[view]
+    public fun unclaimed_fees(registry_addr: address, ticker: String): u128 acquires Registry {
+        let registry = borrow_global<Registry>(registry_addr);
+        let pool = table::borrow(&registry.pools, ticker);
+        pool.fee_accumulated
     }
 
     // ---- Internal ----------------------------------------------------------

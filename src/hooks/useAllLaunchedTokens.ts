@@ -15,6 +15,7 @@ export interface LaunchedToken {
   tokenSupply: bigint;
   basePrice: bigint;
   slope: bigint;
+  feeAccumulated: bigint;
   tradeCount: number;
   graduated: boolean;
   spotPrice: bigint;
@@ -71,6 +72,7 @@ async function fetchPoolForTicker(ticker: string) {
       tokenSupply: 0n,
       basePrice: 0n,
       slope: 0n,
+      feeAccumulated: 0n,
       tradeCount: 0,
       graduated: false,
       spotPrice: 0n,
@@ -84,12 +86,13 @@ async function fetchPoolForTicker(ticker: string) {
       tokenSupply: 0n,
       basePrice: 0n,
       slope: 0n,
+      feeAccumulated: 0n,
       tradeCount: 0,
       graduated: false,
       spotPrice: 0n,
     };
   }
-  const [reserve, supply, base, slope, _fee, count, graduated] = tuple.map((s) => BigInt(s));
+  const [reserve, supply, base, slope, fee, count, graduated] = tuple.map((s) => BigInt(s));
   const spot = base + (supply * slope) / 1_000_000n;
   return {
     poolExists: true,
@@ -97,6 +100,7 @@ async function fetchPoolForTicker(ticker: string) {
     tokenSupply: supply,
     basePrice: base,
     slope,
+    feeAccumulated: fee,
     tradeCount: Number(count),
     graduated: graduated === 1n,
     spotPrice: spot,

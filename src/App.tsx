@@ -8,6 +8,7 @@ const Launchpad = lazy(() => import("@/pages/Launchpad"));
 const Trade = lazy(() => import("@/pages/Trade"));
 const Graduation = lazy(() => import("@/pages/Graduation"));
 const Airdrops = lazy(() => import("@/pages/Airdrops"));
+const Explorer = lazy(() => import("@/pages/Explorer"));
 
 function RouteFallback() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/graduation/:symbol" element={<Graduation />} />
           <Route path="/graduation" element={<Navigate to="/graduation/MOVE" replace />} />
           <Route path="/airdrops" element={<Airdrops />} />
+          <Route path="/explorer" element={<Explorer />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

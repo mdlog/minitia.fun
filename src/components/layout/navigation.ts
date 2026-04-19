@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeftRight, Compass, Gift, Rocket, Trophy } from "lucide-react";
+import { ArrowLeftRight, Compass, Gift, Rocket, Search, Trophy } from "lucide-react";
 
 export interface NavItem {
   to: string;
@@ -52,6 +52,14 @@ export const primaryNav: NavItem[] = [
     description: "Claim community incentives and active drops.",
     icon: Gift,
     activePrefix: "/airdrops",
+  },
+  {
+    to: "/explorer",
+    label: "Explorer",
+    shortLabel: "Explorer",
+    description: "Live blocks and Move transactions on the appchain.",
+    icon: Search,
+    activePrefix: "/explorer",
   },
 ];
 

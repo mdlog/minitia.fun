@@ -55,7 +55,16 @@ export function Web3Providers({ children }: PropsWithChildren) {
       <WagmiProvider config={wagmiConfig}>
         <InterwovenKitProvider
           {...baseChainConfig}
-          customChain={APPCHAIN_CHAIN as never}
+          {...(APPCHAIN_CHAIN
+            ? {
+                customChain: APPCHAIN_CHAIN as never,
+                // Force kit to use customChain (no registry fetch) by making
+                // our rollup the default. Bridge/connect still work against L1
+                // because TESTNET preset's L1 chain remains discoverable from
+                // registryUrl when the bridge drawer queries other chains.
+                defaultChainId: APPCHAIN.chainId,
+              }
+            : {})}
           enableAutoSign={autoSignPolicy}
           theme="dark"
         >

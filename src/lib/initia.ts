@@ -35,6 +35,7 @@ export const INITIA = {
 /**
  * Minitia.fun Launcher Chain (L2 spoke) — Move VM rollup.
  * Spec: 100ms blocks · 10k TPS · Move modules (token_factory, bonding_curve, liquidity_migrator).
+ * Live tunnels (optional) power the Discovery live-stats cards.
  */
 export const APPCHAIN = {
   chainId: "minitia-fun-test-1",
@@ -47,7 +48,12 @@ export const APPCHAIN = {
   graduationThresholdInit: 5_000,
   usernameSuffix: ".fun.init",
   modules: ["token_factory", "bonding_curve", "liquidity_migrator"] as const,
+  deployedAddress: "0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80",
+  rpc: import.meta.env.VITE_APPCHAIN_RPC ?? "",
+  rest: import.meta.env.VITE_APPCHAIN_REST ?? "",
 };
+
+export const APPCHAIN_RPC_AVAILABLE = Boolean(APPCHAIN.rpc);
 
 /** Message types we auto-sign for one-click trading (session keys). */
 export const AUTO_SIGN_MSG_TYPES = [

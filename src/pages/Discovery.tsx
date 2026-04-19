@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Flame } from "lucide-react";
+import { ArrowUpRight, ExternalLink, Flame } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -8,9 +8,16 @@ import { GhostNumeral } from "@/components/ui/GhostNumeral";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { VolumeChart } from "@/components/ui/VolumeChart";
 import { marketStats, trendingTokens } from "@/data/mock";
-import { formatCompact, formatPercent, formatPrice } from "@/lib/format";
+import { useAppchainStats } from "@/hooks/useAppchainStats";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { APPCHAIN } from "@/lib/initia";
+import { formatCompact, formatNumber, formatPercent, formatPrice } from "@/lib/format";
 
 export default function Discovery() {
+  const network = useNetworkStatus();
+  const stats = useAppchainStats();
+  const liveOnRollup = network.data?.source === "appchain" && network.data?.healthy;
+
   return (
     <div className="flex flex-col gap-14 pb-6">
       {/* ── Hero — editorial asymmetric ──────────────── */}
@@ -144,6 +151,100 @@ export default function Discovery() {
           })}
         </div>
       </section>
+
+      {/* ── Live rollup — real on-chain state via public tunnel ─ */}
+      {network.data && (
+        <section className="relative flex flex-col gap-8">
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <div className="flex items-end gap-4">
+              <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
+                § live
+              </span>
+              <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-editorial italic leading-[1] text-editorial-ink">
+                Our rollup, live
+              </h2>
+            </div>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[0.62rem] uppercase tracking-[0.2em] ${
+                liveOnRollup
+                  ? "bg-secondary-container/70 text-secondary"
+                  : "bg-white/[0.04] text-on-surface-variant"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  liveOnRollup ? "bg-secondary animate-pulse" : "bg-on-surface-muted"
+                }`}
+              />
+              {network.isLoading ? "Syncing" : liveOnRollup ? "Live" : network.data.source}
+            </span>
+          </div>
+
+          <div className="h-px hairline" />
+
+          <Card tier="base" padded="lg" className="flex flex-col gap-6">
+            <div className="grid gap-6 md:grid-cols-4">
+              <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
+                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                  chain
+                </span>
+                <span className="font-editorial italic text-title-lg text-editorial">
+                  {network.data.chainId}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
+                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                  block height
+                </span>
+                <span className="font-editorial text-[2rem] leading-none text-editorial-ink">
+                  #{formatNumber(network.data.blockHeight)}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
+                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                  tokens launched
+                </span>
+                <span className="font-editorial text-[2rem] leading-none text-secondary">
+                  {stats.data?.enabled
+                    ? formatNumber(stats.data.launchesOnChain)
+                    : "—"}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
+                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                  move txs
+                </span>
+                <span className="font-editorial text-[2rem] leading-none text-tertiary">
+                  {stats.data?.enabled
+                    ? formatNumber(stats.data.msgExecuteCount)
+                    : "—"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-editorial/15 pt-5 text-body-sm text-on-surface-variant">
+              <div className="flex flex-col gap-0.5">
+                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                  token_factory module
+                </span>
+                <code className="font-mono text-body-sm text-editorial-ink break-all">
+                  {APPCHAIN.deployedAddress}
+                </code>
+              </div>
+              {APPCHAIN.rpc && (
+                <a
+                  href={`${APPCHAIN.rpc}/status`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-secondary hover:text-editorial-ink"
+                >
+                  Verify on RPC <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+          </Card>
+        </section>
+      )}
 
       {/* ── Market Pulsar — single full-width ──────────── */}
       <section className="relative flex flex-col gap-8">

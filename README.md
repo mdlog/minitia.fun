@@ -31,6 +31,8 @@ Minitia.fun is a fair-launch appchain launcher on Initia where anyone mints a to
 | Artefact | Value |
 |---|---|
 | **Rollup chain ID** | `minitia-fun-test-1` (Move VM, Initia DA) |
+| **Rollup RPC** (public) | [`https://evonft.xyz`](https://evonft.xyz/status) — judges: check `/status` for live height |
+| **Rollup REST** (public) | [`https://nectiq.xyz`](https://nectiq.xyz/cosmos/base/tendermint/v1beta1/node_info) — chain info + generic cosmos routes |
 | **Rollup RPC** (local) | `tcp://localhost:36657` |
 | **Deployed module address** | `0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80` (aka `init1czna6myw50xttzp3k2rcldekttmmukuqcu4u6c`) |
 | **Deploy tx** | `579664878BB873C8FAFE50350599D4ED54B9F6B46F4107157FDB3B28A638F0D1` (height 60, gas 243,342) |
@@ -39,6 +41,8 @@ Minitia.fun is a fair-launch appchain launcher on Initia where anyone mints a to
 | **Registry count (on-chain view)** | `1` (verified via `minitiad query move view … token_factory count`) |
 
 Reproduce locally with [`DEPLOY.md`](DEPLOY.md). See [`contracts/README.md`](contracts/README.md) for the Move build / deploy commands.
+
+**Frontend reads from the rollup live** via those public tunnels: the Discovery page's **"Our rollup, live"** card polls `/status` every 5 s for block height and `/tx_search` every 15 s for the on-chain launch count. Judges running `npm run dev` will see the rollup's real chain ID, height, and Move tx count update in real time — verifiable by hitting the tunnel URLs above.
 
 ---
 

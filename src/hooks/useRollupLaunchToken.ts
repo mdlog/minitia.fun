@@ -6,6 +6,11 @@ import { useTxHistory } from "@/hooks/useTxHistory";
 
 const MSG_EXECUTE_JSON_TYPE_URL = "/initia.move.v1.MsgExecuteJSON";
 
+/** Default bonding-curve params every new pool opens with.
+ *  base_price = 1,000 umin = 0.001 MIN/token · slope = 10 */
+const DEFAULT_BASE_PRICE = "1000";
+const DEFAULT_SLOPE = "10";
+
 export interface LaunchTokenPayload {
   name: string;
   ticker: string;
@@ -68,6 +73,9 @@ export function useRollupLaunchToken() {
 
       setPending(true);
       try {
+        // Bundle both messages in one tx: register the token AND open its
+        // bonding-curve pool. Without the second call the token has metadata
+        // but trading is impossible -- /trade/:ticker shows "no pool exists".
         const messages = [
           {
             typeUrl: MSG_EXECUTE_JSON_TYPE_URL,
@@ -82,6 +90,22 @@ export function useRollupLaunchToken() {
                 JSON.stringify(ticker),
                 JSON.stringify(name),
                 JSON.stringify(description),
+              ],
+            },
+          },
+          {
+            typeUrl: MSG_EXECUTE_JSON_TYPE_URL,
+            value: {
+              sender: kit.initiaAddress,
+              moduleAddress: APPCHAIN.deployedAddress,
+              moduleName: "bonding_curve",
+              functionName: "create_pool",
+              typeArgs: [],
+              args: [
+                `"${APPCHAIN.deployedAddress}"`,
+                JSON.stringify(ticker),
+                JSON.stringify(DEFAULT_BASE_PRICE),
+                JSON.stringify(DEFAULT_SLOPE),
               ],
             },
           },

@@ -14,6 +14,7 @@ import { usePoolState, useUserHolding } from "@/hooks/usePoolState";
 import { useTradeAction } from "@/hooks/useTradeAction";
 import { useRecentTrades } from "@/hooks/useRecentTrades";
 import { useComments, useCommentPost } from "@/hooks/useComments";
+import { useCreatePoolAction } from "@/hooks/useCreatePoolAction";
 import { useHolderLeaderboard } from "@/hooks/useHolderLeaderboard";
 import { APPCHAIN } from "@/lib/initia";
 import { cn } from "@/lib/cn";
@@ -55,6 +56,7 @@ export default function Trade() {
   const comments = useComments(ticker, 30);
   const { post: postComment, isPending: isPosting } = useCommentPost();
   const holders = useHolderLeaderboard(ticker, 10);
+  const { create: createPool, isPending: isCreatingPool } = useCreatePoolAction();
   const [commentBody, setCommentBody] = useState("");
 
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
@@ -270,7 +272,7 @@ export default function Trade() {
 
       {/* No pool state */}
       {noPool && (
-        <Card tier="base" padded="lg" className="flex flex-col gap-3">
+        <Card tier="base" padded="lg" className="flex flex-col gap-4">
           <div className="flex items-center gap-2 text-on-surface-variant">
             <Info className="h-4 w-4" />
             <span className="font-mono text-[0.68rem] uppercase tracking-[0.22em]">
@@ -278,10 +280,38 @@ export default function Trade() {
             </span>
           </div>
           <p className="text-body-md text-on-surface-variant max-w-2xl">
-            The token was launched via <code>token_factory</code> but no <code>bonding_curve</code> pool
-            has been initialised. The creator must call <code>create_pool</code> on this rollup before
-            trading is enabled. The MOVE token has a pool already as a reference.
+            This ticker was launched via <code>token_factory</code> before Launchpad started
+            bundling pool creation. Open a curve with default parameters
+            (base_price=1000, slope=10) to enable trading. Permissionless -- any wallet
+            can do it, and gas is paid in MIN.
           </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="md"
+              variant="hyperglow"
+              leading={
+                isCreatingPool ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />
+              }
+              disabled={isCreatingPool || !isConnected}
+              onClick={async () => {
+                if (!isConnected) {
+                  openConnect();
+                  return;
+                }
+                const hash = await createPool(ticker);
+                if (hash) {
+                  setTimeout(() => pool.refetch(), 1500);
+                }
+              }}
+            >
+              {isCreatingPool ? "Opening curve…" : `Open curve for $${ticker}`}
+            </Button>
+            {!isConnected && (
+              <span className="self-center font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                Connect wallet to open curve
+              </span>
+            )}
+          </div>
         </Card>
       )}
 

@@ -28,7 +28,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       <div
         className={cn(
           "relative flex items-center rounded-2xl surface-nested ghost-border px-1 transition-all duration-200",
-          "focus-within:-translate-y-0.5 focus-within:shadow-[0_0_0_1px_rgba(186,158,255,0.28),0_0_0_6px_rgba(186,158,255,0.08)]",
+          "focus-within:-translate-y-0.5 focus-within:shadow-[0_0_0_1px_rgba(91,140,255,0.28),0_0_0_6px_rgba(91,140,255,0.1)]",
           error && "shadow-[0_0_0_1px_rgba(255,84,112,0.35),0_0_0_6px_rgba(255,84,112,0.08)]",
         )}
       >

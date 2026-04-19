@@ -83,9 +83,8 @@ export default function UserProfile() {
   }, [userActivity]);
 
   return (
-    <div className="flex flex-col gap-8 pb-6">
-      {/* Hero */}
-      <section className="relative grain dotgrid rounded-[28px] surface-section px-6 py-10 md:px-10 md:py-12">
+    <div className="page-shell">
+      <section className="page-hero grain dotgrid px-6 py-10 md:px-10 md:py-12">
         <div className="flex flex-wrap items-center gap-5">
           <Avatar symbol={userHex.slice(2, 6).toUpperCase() || "USER"} size="xl" />
           <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -111,7 +110,6 @@ export default function UserProfile() {
           </Chip>
         </div>
 
-        {/* Quick stats strip */}
         <div className="mt-8 grid gap-6 md:grid-cols-4">
           <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
             <span className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
@@ -148,7 +146,6 @@ export default function UserProfile() {
         </div>
       </section>
 
-      {/* Launched tokens */}
       <section className="relative flex flex-col gap-6">
         <div className="flex items-end gap-3">
           <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
@@ -218,7 +215,6 @@ export default function UserProfile() {
         )}
       </section>
 
-      {/* Recent activity */}
       <section className="relative flex flex-col gap-6">
         <div className="flex items-end gap-3">
           <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">

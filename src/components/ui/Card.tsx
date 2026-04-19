@@ -34,10 +34,10 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
     <div
       ref={ref}
       className={cn(
-        "relative rounded-2xl ghost-border transition-all duration-200",
+        "relative rounded-[24px] ghost-border transition-all duration-200",
         glass ? "glass" : tierStyles[tier],
         interactive &&
-          "cursor-pointer hover:surface-card-high hover:shadow-ambient hover:scale-[1.005]",
+          "cursor-pointer hover:-translate-y-0.5 hover:surface-card-high hover:shadow-ambient-lg",
         padClass,
         className,
       )}

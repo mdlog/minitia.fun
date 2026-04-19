@@ -22,23 +22,23 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<Variant, string> = {
   primary:
-    "bg-primary text-primary-on shadow-sm hover:bg-primary-dim hover:shadow",
+    "bg-gradient-primary text-primary-on shadow-glow-primary hover:-translate-y-0.5 hover:brightness-[1.04]",
   secondary:
-    "bg-secondary text-secondary-on shadow-sm hover:bg-secondary-dim hover:shadow",
+    "bg-secondary text-secondary-on shadow-glow-secondary hover:-translate-y-0.5 hover:bg-secondary-dim",
   glass:
-    "glass-low text-on-surface ghost-border hover:bg-white/[0.08] hover:text-on-surface",
+    "glass-low text-on-surface ghost-border hover:-translate-y-0.5 hover:bg-white/[0.1] hover:text-on-surface",
   tertiary:
-    "bg-transparent text-on-surface-variant hover:bg-white/[0.04] hover:text-on-surface",
+    "bg-transparent text-on-surface-variant hover:bg-white/[0.05] hover:text-on-surface",
   hyperglow:
-    "bg-gradient-hyperglow text-on-primary shadow-sm hover:shadow",
+    "bg-gradient-hyperglow text-on-primary shadow-[0_16px_40px_rgba(47,197,164,0.24)] hover:-translate-y-0.5 hover:brightness-[1.03]",
   danger:
-    "bg-error text-error-on shadow-sm hover:brightness-110",
+    "bg-error text-error-on shadow-[0_14px_34px_rgba(255,107,122,0.2)] hover:-translate-y-0.5 hover:brightness-105",
 };
 
 const sizeStyles: Record<Size, string> = {
-  sm: "h-9 rounded-lg px-3.5 text-body-sm",
-  md: "h-10 rounded-lg px-4.5 text-body-md",
-  lg: "h-11 rounded-lg px-6 text-body-md",
+  sm: "h-9 rounded-xl px-3.5 text-body-sm",
+  md: "h-11 rounded-xl px-4.5 text-body-md",
+  lg: "h-12 rounded-xl px-6 text-body-md",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(

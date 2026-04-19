@@ -41,26 +41,53 @@ export default function Airdrops() {
   const connected = Boolean(kit.isConnected && kit.hexAddress);
 
   return (
-    <div className="flex flex-col gap-10 pb-6">
-      {/* Header */}
-      <section className="flex flex-col gap-3 max-w-2xl">
-        <div className="flex items-center gap-3 font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-          <span>§ creator rewards</span>
-          <span className="h-px flex-1 hairline" />
+    <div className="page-shell">
+      <section className="page-hero px-6 py-8 md:px-8 md:py-9">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-3 font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
+              <span>§ creator rewards</span>
+              <span className="h-px flex-1 hairline" />
+            </div>
+            <h1 className="mt-3 text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.98] text-editorial-ink">
+              <span className="font-editorial italic text-editorial">claim</span>{" "}
+              <span className="font-display font-medium tracking-tight">your fees</span>
+              <span className="text-secondary">.</span>
+            </h1>
+            <p className="mt-4 text-body-lg leading-[1.6] text-on-surface-variant">
+              Every trade on your pool pays a 0.5% fee into <code className="font-mono text-editorial-ink">fee_accumulated</code>.
+              This page keeps creator income, claimable pools, and claim actions in one cleaner surface.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="metric-card px-5 py-5">
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
+                unclaimed
+              </span>
+              <div className="mt-2 font-editorial italic text-[2.4rem] leading-none text-editorial-ink">
+                {formatInit(totalUnclaimed, 2)}
+              </div>
+              <div className="mt-1 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-secondary">
+                MIN
+              </div>
+            </div>
+
+            <div className="metric-card px-5 py-5">
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
+                claimable pools
+              </span>
+              <div className="mt-2 text-title-lg text-on-surface">
+                {claimableCount} of {myPools.length}
+              </div>
+              <div className="mt-1 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                creator wallets only
+              </div>
+            </div>
+          </div>
         </div>
-        <h1 className="text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.98] text-editorial-ink">
-          <span className="font-editorial italic text-editorial">claim</span>{" "}
-          <span className="font-display font-medium tracking-tight">your fees</span>
-          <span className="text-secondary">.</span>
-        </h1>
-        <p className="text-body-lg leading-[1.5] text-on-surface-variant">
-          Every trade on your pool pays a 0.5% fee into <code className="font-mono text-editorial-ink">fee_accumulated</code>.
-          As the pool creator you can drain it any time. Phase 1 is accounting-only — fees are
-          recognized on-chain and event-emitted; full umin custody unlocks on Phase 2 / graduation.
-        </p>
       </section>
 
-      {/* Summary */}
       <Card tier="base" padded="lg" className="flex flex-wrap items-center justify-between gap-6">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[0.62rem] uppercase tracking-[0.28em] text-on-surface-muted">
@@ -82,7 +109,6 @@ export default function Airdrops() {
         ) : null}
       </Card>
 
-      {/* Grid */}
       {!connected ? (
         <Card tier="base" padded="lg" className="text-center text-on-surface-variant">
           <span className="font-mono text-label-sm uppercase tracking-[0.2em]">

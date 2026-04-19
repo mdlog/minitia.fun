@@ -47,8 +47,8 @@ export function CandleChart({
       >
         <defs>
           <linearGradient id="trendGrad" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#00EEFC" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#00EEFC" stopOpacity="0" />
+            <stop offset="0%" stopColor="#5B8CFF" stopOpacity="0.34" />
+            <stop offset="100%" stopColor="#5B8CFF" stopOpacity="0" />
           </linearGradient>
         </defs>
         <polyline
@@ -56,7 +56,7 @@ export function CandleChart({
             .map((d, i) => `${(i / (data.length - 1)) * 100},${y(d.close)}`)
             .join(" ")}
           fill="none"
-          stroke="#00EEFC"
+          stroke="#5B8CFF"
           strokeWidth="0.4"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -98,7 +98,7 @@ export function CandleChart({
                 className={cn(
                   "absolute left-0 right-0 rounded-sm",
                   bullish ? "bg-secondary" : "bg-error",
-                  bullish && "shadow-[0_0_8px_rgba(0,238,252,0.4)]",
+                  bullish && "shadow-[0_0_10px_rgba(47,197,164,0.24)]",
                 )}
                 style={{
                   top: `${bodyTop}%`,

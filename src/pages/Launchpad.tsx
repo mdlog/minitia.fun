@@ -130,17 +130,52 @@ export default function Launchpad() {
   ];
 
   return (
-    <div className="flex flex-col gap-8 pb-6">
-      <section className="flex flex-col gap-3 max-w-2xl">
-        <div className="flex items-center gap-3 font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-          <span>§ launchpad</span>
-          <span className="h-px flex-1 hairline" />
+    <div className="page-shell">
+      <section className="page-hero px-6 py-8 md:px-8 md:py-9">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-3 font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
+              <span>§ launchpad</span>
+              <span className="h-px flex-1 hairline" />
+            </div>
+            <h1 className="mt-3 text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.98] text-editorial-ink">
+              <span className="font-editorial italic">Launch</span>{" "}
+              <span className="font-display font-medium tracking-tight">your token</span>
+              <span className="text-editorial">.</span>
+            </h1>
+            <p className="mt-4 max-w-2xl text-body-lg leading-[1.6] text-on-surface-variant">
+              Prepare metadata, stage the visual identity, and publish to the Minitia rollup from a calmer, more structured studio flow.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="metric-card px-5 py-4">
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
+                draft readiness
+              </span>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <span className="font-editorial italic text-[2.35rem] leading-none text-editorial-ink">
+                  {readiness}%
+                </span>
+                <Chip tone={readiness >= 80 ? "success" : "warning"} dense>
+                  {readinessLabel}
+                </Chip>
+              </div>
+            </div>
+
+            <div className="metric-card px-5 py-4">
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
+                launch target
+              </span>
+              <div className="mt-2 text-body-md text-on-surface">
+                {APPCHAIN.chainId}
+              </div>
+              <div className="mt-1 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                {subdomain}.fun.init
+              </div>
+            </div>
+          </div>
         </div>
-        <h1 className="text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.98] text-editorial-ink">
-          <span className="font-editorial italic">Launch</span>{" "}
-          <span className="font-display font-medium tracking-tight">your token</span>
-          <span className="text-editorial">.</span>
-        </h1>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">

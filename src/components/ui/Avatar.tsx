@@ -15,9 +15,9 @@ const sizeMap = {
 };
 
 const gradientMap: Record<string, string> = {
-  "gradient-1": "bg-[conic-gradient(from_120deg,#BA9EFF,#FF59E3,#00EEFC,#BA9EFF)]",
-  "gradient-2": "bg-[conic-gradient(from_0deg,#FF59E3,#8455EF,#00EEFC,#FF59E3)]",
-  "gradient-3": "bg-[conic-gradient(from_240deg,#00EEFC,#BA9EFF,#FF59E3,#00EEFC)]",
+  "gradient-1": "bg-[conic-gradient(from_120deg,#A9BEFF,#4F82E8,#2FC5A4,#A9BEFF)]",
+  "gradient-2": "bg-[conic-gradient(from_0deg,#C9D5FF,#6C87BA,#143458,#C9D5FF)]",
+  "gradient-3": "bg-[conic-gradient(from_240deg,#2FC5A4,#89AFFF,#5A7DD8,#2FC5A4)]",
 };
 
 function hash(s: string): number {
@@ -32,7 +32,7 @@ export function Avatar({ symbol, size = "md", variant = "auto", className }: Ava
   return (
     <div
       className={cn(
-        "relative flex shrink-0 items-center justify-center rounded-full font-mono font-bold text-surface shadow-[0_16px_28px_rgba(0,0,0,0.22)] ring-1 ring-white/10",
+        "relative flex shrink-0 items-center justify-center rounded-full font-mono font-bold text-surface shadow-[0_18px_34px_rgba(3,8,18,0.28)] ring-1 ring-white/10",
         "before:absolute before:inset-[1px] before:rounded-full before:bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.24),rgba(255,255,255,0)_45%)] before:content-['']",
         sizeMap[size],
         gradientMap[key],

@@ -65,32 +65,38 @@ export default function Discovery() {
   }, [tokens.data, filter]);
 
   return (
-    <div className="flex flex-col gap-14 pb-6">
-      {/* ── Hero ──────────────────────────────────────── */}
-      <section className="relative grain dotgrid rounded-[28px] surface-section px-6 py-14 md:px-10 md:py-20 overflow-hidden">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <h1 className="reveal text-on-surface" style={{ ["--d" as string]: "80ms" }}>
-            <span className="block text-[clamp(3rem,9vw,7rem)] font-editorial italic leading-[0.95] text-editorial-ink">
-              Launch
-            </span>
-            <span className="block text-[clamp(2.25rem,6.5vw,5.25rem)] font-display font-medium leading-[0.98] tracking-tight">
-              anything. <span className="text-on-surface-variant">Graduate</span>
-            </span>
-            <span className="block text-[clamp(2.25rem,6.5vw,5.25rem)] font-display font-medium leading-[0.98] tracking-tight">
-              <span className="font-editorial italic font-normal text-editorial">fast</span>
-              <span className="text-secondary">.</span>
-            </span>
-          </h1>
+    <div className="page-shell">
+      <section className="page-hero grain dotgrid px-6 py-10 md:px-10 md:py-12">
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
+          <div className="reveal text-on-surface" style={{ ["--d" as string]: "80ms" }}>
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Chip tone="info" dense>
+                Live token discovery
+              </Chip>
+              <Chip tone={liveOnRollup ? "success" : "neutral"} dense>
+                {liveOnRollup ? "Appchain healthy" : "Syncing status"}
+              </Chip>
+            </div>
 
-          <div
-            className="reveal flex flex-col gap-5 lg:w-[300px]"
-            style={{ ["--d" as string]: "240ms" }}
-          >
-            <p className="text-body-lg leading-[1.55] text-on-surface-variant">
-              A sovereign launchpad for the Initia stack. Deploy a token, trade it on-curve, then
-              promote it to its own appchain — all in one cockpit.
+            <h1>
+              <span className="block text-[clamp(3rem,9vw,7rem)] font-editorial italic leading-[0.95] text-editorial-ink">
+                Launch
+              </span>
+              <span className="block text-[clamp(2.25rem,6.5vw,5.25rem)] font-display font-medium leading-[0.98] tracking-tight">
+                anything. <span className="text-on-surface-variant">Graduate</span>
+              </span>
+              <span className="block text-[clamp(2.25rem,6.5vw,5.25rem)] font-display font-medium leading-[0.98] tracking-tight">
+                <span className="font-editorial italic font-normal text-editorial">fast</span>
+                <span className="text-secondary">.</span>
+              </span>
+            </h1>
+
+            <p className="mt-5 max-w-3xl text-body-lg leading-[1.6] text-on-surface-variant">
+              A more polished control surface for the Initia launch flow: deploy a token, monitor
+              live on-curve activity, then graduate demand into its own appchain without leaving the product.
             </p>
-            <div className="flex flex-wrap gap-2">
+
+            <div className="mt-6 flex flex-wrap gap-2">
               <Button asChild variant="hyperglow" size="md" leading={<Flame className="h-4 w-4" />}>
                 <Link to="/launchpad">Launch token</Link>
               </Button>
@@ -99,10 +105,51 @@ export default function Discovery() {
               </Button>
             </div>
           </div>
+
+          <div
+            className="reveal grid gap-3 sm:grid-cols-2 xl:grid-cols-1"
+            style={{ ["--d" as string]: "240ms" }}
+          >
+            <div className="metric-card px-5 py-5">
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
+                tokens indexed
+              </span>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <span className="font-editorial italic text-[2.5rem] leading-none text-editorial-ink">
+                  {tokens.data?.length ?? 0}
+                </span>
+                <span className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-secondary">
+                  live
+                </span>
+              </div>
+            </div>
+
+            <div className="metric-card px-5 py-5">
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
+                network pulse
+              </span>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <span className="font-display text-title-lg text-on-surface">
+                  {network.isLoading ? "Checking" : liveOnRollup ? "Healthy" : network.data?.source ?? "Offline"}
+                </span>
+                <span className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                  #{network.data?.blockHeight ? formatNumber(network.data.blockHeight) : "—"}
+                </span>
+              </div>
+            </div>
+
+            <div className="metric-card px-5 py-5 sm:col-span-2 xl:col-span-1">
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
+                launch objective
+              </span>
+              <p className="mt-2 text-body-sm leading-relaxed text-on-surface-variant">
+                Keep the front page focused on signal: active tickers, graduation progress, and chain readiness.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── Live feed — every token launched on the rollup ─ */}
       <section className="relative flex flex-col gap-8">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex items-end gap-4">
@@ -336,7 +383,6 @@ export default function Discovery() {
         )}
       </section>
 
-      {/* ── Live rollup — real on-chain state via public tunnel ─ */}
       {network.data && (
         <section className="relative flex flex-col gap-8">
           <div className="flex flex-wrap items-end justify-between gap-6">

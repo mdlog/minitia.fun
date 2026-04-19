@@ -1,5 +1,6 @@
-import { ArrowUpRight, Copy, ExternalLink, RefreshCcw, Search } from "lucide-react";
+import { ArrowUpRight, Copy, RefreshCcw } from "lucide-react";
 import { useMemo, useState } from "react";
+import { ExplorerSearchBar } from "@/components/explorer/SearchBar";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { Stat } from "@/components/ui/Stat";
@@ -70,7 +71,7 @@ export default function Explorer() {
 
   if (!APPCHAIN_RPC_AVAILABLE) {
     return (
-      <div className="flex flex-col gap-10 pb-6">
+      <div className="page-shell">
         <section className="max-w-2xl">
           <h1 className="text-[clamp(2rem,5vw,3.5rem)] font-editorial italic leading-[1.04] text-editorial-ink">
             Appchain explorer.
@@ -86,34 +87,75 @@ export default function Explorer() {
   }
 
   return (
-    <div className="flex flex-col gap-10 pb-6">
-      {/* Header */}
-      <section className="flex flex-col gap-3 max-w-3xl">
-        <div className="flex items-center gap-3 font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-          <span>§ explorer</span>
-          <span className="h-px flex-1 hairline" />
+    <div className="page-shell">
+      <section className="page-hero px-6 py-8 md:px-8 md:py-9">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-3 font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
+              <span>§ explorer</span>
+              <span className="h-px flex-1 hairline" />
+            </div>
+            <h1 className="mt-3 text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.98] text-editorial-ink">
+              <span className="font-editorial italic text-editorial">{APPCHAIN.chainId}</span>{" "}
+              <span className="font-display font-medium tracking-tight">explorer</span>
+              <span className="text-secondary">.</span>
+            </h1>
+            <p className="mt-4 text-body-lg leading-[1.6] text-on-surface-variant">
+              Live view of the Minitia.fun rollup. Blocks refresh every 3 seconds, Move transactions
+              every 10 seconds. All data fetched directly from{" "}
+              <a
+                href={`${rpcBase}/status`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-secondary hover:text-editorial-ink"
+              >
+                {rpcBase}
+              </a>
+              .
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="metric-card px-5 py-5">
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
+                chain status
+              </span>
+              <div className="mt-2 text-title-lg text-on-surface">
+                {live ? "Live on appchain" : "Syncing"}
+              </div>
+              <div className="mt-1 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-secondary">
+                #{network.data ? formatNumber(network.data.blockHeight) : "—"}
+              </div>
+            </div>
+
+            <div className="metric-card px-5 py-5">
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
+                avg block time
+              </span>
+              <div className="mt-2 font-editorial italic text-[2.2rem] leading-none text-editorial-ink">
+                {secondsPerBlock ? `${secondsPerBlock.toFixed(2)}s` : "—"}
+              </div>
+              <div className="mt-1 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
+                target {APPCHAIN.blockTimeMs}ms
+              </div>
+            </div>
+          </div>
         </div>
-        <h1 className="text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.98] text-editorial-ink">
-          <span className="font-editorial italic text-editorial">{APPCHAIN.chainId}</span>{" "}
-          <span className="font-display font-medium tracking-tight">explorer</span>
-          <span className="text-secondary">.</span>
-        </h1>
-        <p className="text-body-lg text-on-surface-variant">
-          Live view of the Minitia.fun rollup. Blocks refresh every 3 seconds, Move transactions
-          every 10 seconds. All data fetched directly from{" "}
-          <a
-            href={`${rpcBase}/status`}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono text-secondary hover:text-editorial-ink"
-          >
-            {rpcBase}
-          </a>
-          .
-        </p>
       </section>
 
-      {/* Summary cards */}
+      <Card tier="base" padded="md" className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
+            § search
+          </span>
+          <span className="h-px flex-1 hairline" />
+          <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
+            tx · block · address · ticker
+          </span>
+        </div>
+        <ExplorerSearchBar />
+      </Card>
+
       <section className="grid gap-4 md:grid-cols-4">
         <Card padded="md">
           <div className="flex items-center justify-between">
@@ -152,7 +194,6 @@ export default function Explorer() {
         </Card>
       </section>
 
-      {/* Module card */}
       <Card tier="base" padded="lg" className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
@@ -202,7 +243,6 @@ export default function Explorer() {
         </div>
       </Card>
 
-      {/* Recent blocks + Recent Move txs */}
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
         {/* Recent blocks */}
         <Card tier="base" padded="md" className="flex flex-col gap-4">
@@ -342,31 +382,6 @@ export default function Explorer() {
         </Card>
       </section>
 
-      {/* Search hint */}
-      <Card tier="base" padded="md" className="flex flex-wrap items-center gap-4">
-        <Search className="h-4 w-4 text-on-surface-muted" />
-        <span className="text-body-sm text-on-surface-variant">
-          Need a specific block or tx? Use raw RPC:
-        </span>
-        <a
-          href={`${rpcBase}/block?height=1`}
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono text-body-sm text-secondary hover:text-editorial-ink inline-flex items-center gap-1"
-        >
-          /block?height=N
-          <ExternalLink className="h-3 w-3" />
-        </a>
-        <a
-          href={`${rpcBase}/tx_search?query=%22tx.height%3E0%22`}
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono text-body-sm text-secondary hover:text-editorial-ink inline-flex items-center gap-1"
-        >
-          /tx_search?query=...
-          <ExternalLink className="h-3 w-3" />
-        </a>
-      </Card>
     </div>
   );
 }

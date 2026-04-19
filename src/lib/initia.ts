@@ -37,6 +37,36 @@ export const INITIA = {
  * Spec: 100ms blocks · 10k TPS · Move modules (token_factory, bonding_curve, liquidity_migrator).
  * Live tunnels (optional) power the Discovery live-stats cards.
  */
+
+/** Loose Chain shape compatible with @initia/initia-registry-types so we
+ *  can pass it as `customChain` to InterwovenKitProvider without taking a
+ *  hard runtime dep on the registry types package. */
+export interface AppchainChainConfig {
+  chain_name: string;
+  chain_id: string;
+  pretty_name?: string;
+  network_type: "testnet" | "mainnet" | "devnet";
+  bech32_prefix: "init";
+  slip44: number;
+  key_algos: ("secp256k1" | "initia_ethsecp256k1")[];
+  fees: {
+    fee_tokens: Array<{
+      denom: string;
+      fixed_min_gas_price?: number;
+      low_gas_price?: number;
+      average_gas_price?: number;
+      high_gas_price?: number;
+    }>;
+  };
+  apis: {
+    rpc: Array<{ address: string }>;
+    rest: Array<{ address: string }>;
+  };
+  metadata?: {
+    minitia?: { type: "minimove" | "miniwasm" | "minievm"; version: string };
+  };
+}
+
 export const APPCHAIN = {
   chainId: "minitia-fun-test-1",
   vm: "move" as const,
@@ -56,6 +86,41 @@ export const APPCHAIN = {
 
 export const APPCHAIN_RPC_AVAILABLE = Boolean(APPCHAIN.rpc);
 export const APPCHAIN_FAUCET_AVAILABLE = Boolean(APPCHAIN.faucet);
+
+/** Registry-shaped chain config so InterwovenKitProvider knows about our
+ *  rollup. Without this, kit.requestTxBlock can't route to chainId
+ *  `minitia-fun-test-1`. With it, the wallet adapter (Privy / MetaMask /
+ *  Keplr / Leap) handles signing in whichever mode the wallet expects
+ *  (eth_secp256k1 / direct / amino) — no manual cosmjs juggling. */
+export const APPCHAIN_CHAIN: AppchainChainConfig | undefined = APPCHAIN_RPC_AVAILABLE
+  ? {
+      chain_name: "minitia-fun",
+      chain_id: APPCHAIN.chainId,
+      pretty_name: "Minitia.fun",
+      network_type: "testnet",
+      bech32_prefix: "init",
+      slip44: 60,
+      key_algos: ["initia_ethsecp256k1"],
+      fees: {
+        fee_tokens: [
+          {
+            denom: APPCHAIN.denom,
+            fixed_min_gas_price: 0.15,
+            low_gas_price: 0.15,
+            average_gas_price: 0.15,
+            high_gas_price: 0.3,
+          },
+        ],
+      },
+      apis: {
+        rpc: [{ address: APPCHAIN.rpc }],
+        rest: [{ address: APPCHAIN.rest || APPCHAIN.rpc }],
+      },
+      metadata: {
+        minitia: { type: "minimove", version: "v1.1.11" },
+      },
+    }
+  : undefined;
 
 /** Fetch the user's umin balance on the rollup via REST. Returns 0 if the
  *  account hasn't been touched on-chain yet (the classic "does not exist"

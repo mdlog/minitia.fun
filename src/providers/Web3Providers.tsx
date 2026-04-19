@@ -10,7 +10,13 @@ import {
   MAINNET,
 } from "@initia/interwovenkit-react";
 import InterwovenKitStyles from "@initia/interwovenkit-react/styles.js";
-import { APPCHAIN, AUTO_SIGN_MSG_TYPES, INITIA_CHAIN_ID, INITIA_NETWORK } from "@/lib/initia";
+import {
+  APPCHAIN,
+  APPCHAIN_CHAIN,
+  AUTO_SIGN_MSG_TYPES,
+  INITIA_CHAIN_ID,
+  INITIA_NETWORK,
+} from "@/lib/initia";
 
 const wagmiConfig = createConfig({
   connectors: [initiaPrivyWalletConnector],
@@ -49,6 +55,7 @@ export function Web3Providers({ children }: PropsWithChildren) {
       <WagmiProvider config={wagmiConfig}>
         <InterwovenKitProvider
           {...baseChainConfig}
+          customChain={APPCHAIN_CHAIN as never}
           enableAutoSign={autoSignPolicy}
           theme="dark"
         >

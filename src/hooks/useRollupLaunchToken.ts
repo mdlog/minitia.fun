@@ -1,45 +1,10 @@
 import { useCallback, useState } from "react";
-import {
-  SigningStargateClient,
-  GasPrice,
-  AminoTypes,
-  calculateFee,
-  type DeliverTxResponse,
-  type StdFee,
-} from "@cosmjs/stargate";
-import { Registry } from "@cosmjs/proto-signing";
-import { defaultRegistryTypes } from "@cosmjs/stargate";
-import { MsgExecuteJSON } from "@initia/initia.proto/initia/move/v1/tx";
-import { aminoConverters as initiaAminoConverters, protoRegistry as initiaProtoRegistry } from "@initia/amino-converter";
 import { useInterwovenKit } from "@initia/interwovenkit-react";
 import { APPCHAIN, APPCHAIN_RPC_AVAILABLE } from "@/lib/initia";
 import { useToast } from "@/components/ui/Toast";
 import { useTxHistory } from "@/hooks/useTxHistory";
 
 const MSG_EXECUTE_JSON_TYPE_URL = "/initia.move.v1.MsgExecuteJSON";
-
-type Registered = InstanceType<typeof Registry>;
-let cachedRegistry: Registered | null = null;
-let cachedAminoTypes: AminoTypes | null = null;
-
-function buildRegistry(): Registered {
-  if (cachedRegistry) return cachedRegistry;
-  // Merge default cosmos types + Initia's full proto registry (covers Move,
-  // OPinit, IBC, etc.) + an explicit MsgExecuteJSON entry for safety.
-  const registry = new Registry([...defaultRegistryTypes, ...initiaProtoRegistry]);
-  registry.register(MSG_EXECUTE_JSON_TYPE_URL, MsgExecuteJSON);
-  cachedRegistry = registry;
-  return registry;
-}
-
-function buildAminoTypes(): AminoTypes {
-  if (cachedAminoTypes) return cachedAminoTypes;
-  // @initia/amino-converter ships converters for every Initia-native message,
-  // including /initia.move.v1.MsgExecuteJSON — without these, Keplr/Leap reject
-  // the sign request because they default to ADR-031 amino_json.
-  cachedAminoTypes = new AminoTypes({ ...initiaAminoConverters });
-  return cachedAminoTypes;
-}
 
 export interface LaunchTokenPayload {
   name: string;
@@ -55,20 +20,18 @@ export interface LaunchTokenResult {
 }
 
 /**
- * Real launch: broadcasts `/initia.move.v1.MsgExecuteJSON` against the
- * Minitia.fun rollup via its public tunnel RPC, calling `token_factory::launch`
- * with the user's ticker/name/description. Uses the connected wallet's
- * offlineSigner (from InterwovenKit) to sign with the user's own keys —
- * no private key ever leaves the wallet.
+ * Real launch via InterwovenKit's `requestTxBlock` against the rollup
+ * (chainId from APPCHAIN_CHAIN customChain config). Lets the kit handle
+ * wallet-specific signing (MetaMask uses eth_secp256k1; Privy/Keplr/Leap
+ * use direct/amino as appropriate). No raw cosmjs juggling needed.
  *
- * The user must have a balance of `umin` on the rollup (genesis-accounted
- * addresses, airdrop recipients, etc.). Non-genesis users get "insufficient
- * funds" — a post-launch faucet for MIN is a Phase 2 item.
+ * The signing wallet must hold `umin` on the rollup. Use the in-app
+ * "Get 10 MIN" button (Launchpad) which calls the local faucet.
  */
 export function useRollupLaunchToken() {
-  const { isConnected, initiaAddress, offlineSigner, openConnect } = useInterwovenKit();
+  const kit = useInterwovenKit();
   const toast = useToast();
-  const history = useTxHistory(initiaAddress);
+  const history = useTxHistory(kit.initiaAddress);
   const [isPending, setPending] = useState(false);
 
   const launch = useCallback(
@@ -81,9 +44,9 @@ export function useRollupLaunchToken() {
         });
         return undefined;
       }
-      if (!isConnected || !initiaAddress || !offlineSigner) {
+      if (!kit.isConnected || !kit.initiaAddress) {
         toast.push({ tone: "info", title: "Connect a wallet to continue" });
-        openConnect();
+        kit.openConnect();
         return undefined;
       }
 
@@ -100,62 +63,42 @@ export function useRollupLaunchToken() {
       const pendingId = toast.push({
         tone: "loading",
         title: `Launch $${ticker}`,
-        description: "Signing MsgExecuteJSON and broadcasting to the rollup…",
+        description: `Signing on ${APPCHAIN.chainId}…`,
       });
 
       setPending(true);
-
       try {
-        const registry = buildRegistry();
-        const aminoTypes = buildAminoTypes();
-        const client = await SigningStargateClient.connectWithSigner(
-          APPCHAIN.rpc,
-          offlineSigner,
+        const messages = [
           {
-            registry,
-            aminoTypes,
-            gasPrice: GasPrice.fromString(`0.15${APPCHAIN.denom}`),
+            typeUrl: MSG_EXECUTE_JSON_TYPE_URL,
+            value: {
+              sender: kit.initiaAddress,
+              moduleAddress: APPCHAIN.deployedAddress,
+              moduleName: "token_factory",
+              functionName: "launch",
+              typeArgs: [],
+              args: [
+                `"${APPCHAIN.deployedAddress}"`,
+                JSON.stringify(ticker),
+                JSON.stringify(name),
+                JSON.stringify(description),
+              ],
+            },
           },
-        );
-
-        // MsgExecuteJSON expects:
-        //   - args: string[] — each is the raw JSON representation of the arg.
-        //     For `address` the repr is a hex string; for `String` it's a
-        //     JSON-quoted string.
-        const msg = {
-          typeUrl: MSG_EXECUTE_JSON_TYPE_URL,
-          value: MsgExecuteJSON.fromPartial({
-            sender: initiaAddress,
-            moduleAddress: APPCHAIN.deployedAddress,
-            moduleName: "token_factory",
-            functionName: "launch",
-            typeArgs: [],
-            args: [
-              `"${APPCHAIN.deployedAddress}"`,
-              JSON.stringify(ticker),
-              JSON.stringify(name),
-              JSON.stringify(description),
-            ],
-          }),
-        };
-
+        ];
         const memo = JSON.stringify({
           app: "minitia.fun",
           ticker,
           subdomain,
+          ts: Date.now(), // breaks tx-cache hash on retry with same payload
           schemaVersion: 1,
         });
 
-        // Skip the auto-simulate path — it 500s for fresh accounts with
-        // pub_key=null on minitia rollups. Use a flat fee that's plenty for
-        // a single MsgExecuteJSON (~250k gas typical).
-        const fee: StdFee = calculateFee(800_000, GasPrice.fromString(`0.15${APPCHAIN.denom}`));
-        const result: DeliverTxResponse = await client.signAndBroadcast(
-          initiaAddress,
-          [msg],
-          fee,
+        const result = await kit.requestTxBlock({
+          chainId: APPCHAIN.chainId,
+          messages,
           memo,
-        );
+        });
 
         if (result.code !== 0) {
           throw new Error(result.rawLog || `code ${result.code}`);
@@ -196,7 +139,7 @@ export function useRollupLaunchToken() {
         setPending(false);
       }
     },
-    [isConnected, initiaAddress, offlineSigner, openConnect, toast, history],
+    [kit, toast, history],
   );
 
   return { launch, isPending };

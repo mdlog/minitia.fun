@@ -12,6 +12,7 @@ import { useGraduationEvent } from "@/hooks/useGraduationEvent";
 import { useHolderLeaderboard } from "@/hooks/useHolderLeaderboard";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { usePoolState } from "@/hooks/usePoolState";
+import { usePromotionStage, useStagePromotionAction } from "@/hooks/usePromotionStage";
 import { APPCHAIN } from "@/lib/initia";
 
 function formatMin(umin: bigint, digits = 4): string {
@@ -53,6 +54,8 @@ export default function Graduation() {
   const network = useNetworkStatus();
   const tokens = useAllLaunchedTokens(50);
   const { claim, isPending: isClaiming } = useClaimFeesAction();
+  const promotion = usePromotionStage(ticker);
+  const { stage: stagePromotion, isPending: isStaging } = useStagePromotionAction();
 
   const tokenMeta = useMemo(
     () => (tokens.data ?? []).find((t) => t.ticker === ticker),
@@ -324,58 +327,161 @@ export default function Graduation() {
         )}
       </section>
 
-      {/* Honest roadmap disclosure */}
-      <section className="section-panel flex flex-col gap-3 px-6 py-6 md:px-7">
+      {/* Appchain promotion -- real state machine */}
+      <section className="section-panel flex flex-col gap-4 px-6 py-6 md:px-7">
         <div className="flex items-center gap-3 font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-          <span>§ next · appchain promotion</span>
+          <span>§ appchain promotion</span>
           <span className="h-px flex-1 hairline" />
         </div>
-        <p className="text-body-md text-on-surface-variant leading-[1.6]">
-          Graduation freezes the curve, locks holder positions, and seals the
-          final reserve. The <span className="text-editorial-ink">appchain
-          spawn flow</span> (OPinit rollup + token bridge + InitiaDEX seeding)
-          is the next milestone — not wired in this build. The reserve stays
-          custodied in the module vault until the migrator contract is live.
-        </p>
+
+        {/* Stage CTA (pre-stage) */}
+        {!promotion.data?.exists && (
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="max-w-2xl text-body-md leading-[1.6] text-on-surface-variant">
+              Stage this graduation for rollup spawn. Emits{" "}
+              <code className="font-mono text-editorial-ink">liquidity_migrator::PromotionStaged</code>
+              {" "}— the promoter daemon (scripts/promoter.mjs) picks it up, prepares a
+              <code className="ml-1 font-mono text-editorial-ink">weave rollup launch</code>
+              {" "}config, and spawns <span className="text-editorial-ink">{ticker.toLowerCase()}-fun-1</span>.
+            </p>
+            {isCreator ? (
+              <Button
+                variant="hyperglow"
+                size="lg"
+                leading={isStaging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+                disabled={isStaging}
+                onClick={async () => {
+                  const ok = await stagePromotion(ticker);
+                  if (ok) setTimeout(() => promotion.refetch(), 1500);
+                }}
+              >
+                {isStaging ? "Staging…" : "Stage promotion"}
+              </Button>
+            ) : (
+              <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                only pool creator can stage
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Staged (awaiting spawn) */}
+        {promotion.data?.exists && promotion.data.status === 0 && (
+          <div className="flex flex-col gap-3 rounded-xl bg-amber-400/10 p-4 ghost-border">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-amber-300" />
+              <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-amber-300">
+                staged · waiting for promoter daemon
+              </span>
+            </div>
+            <p className="text-body-sm leading-[1.6] text-on-surface-variant">
+              Event on-chain. Promoter akan generate
+              <code className="mx-1 font-mono text-editorial-ink">
+                rollup-{ticker.toLowerCase()}.json
+              </code>
+              dan jalankan <code className="font-mono text-editorial-ink">weave rollup launch --with-config</code>.
+              Begitu rollup live, <code className="font-mono text-editorial-ink">record_rollup</code> akan dipanggil
+              dan card ini jadi hijau.
+            </p>
+            <div className="grid gap-2 font-mono text-[0.6rem] md:grid-cols-3">
+              <span>
+                <span className="text-on-surface-muted">final_reserve</span>{" "}
+                <span className="text-on-surface">{formatMin(promotion.data.finalReserve, 4)} MIN</span>
+              </span>
+              <span>
+                <span className="text-on-surface-muted">final_supply</span>{" "}
+                <span className="text-on-surface">
+                  {Number(promotion.data.finalSupply).toLocaleString()}
+                </span>
+              </span>
+              <span>
+                <span className="text-on-surface-muted">chain_id</span>{" "}
+                <span className="text-editorial-ink">{ticker.toLowerCase()}-fun-1</span>
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Live (rollup spawned) */}
+        {promotion.data?.exists && promotion.data.status === 1 && (
+          <div className="flex flex-col gap-3 rounded-xl bg-emerald-400/10 p-4 ghost-border">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+              <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-emerald-300">
+                appchain live
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2 break-all">
+              <span className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                chain_id
+              </span>
+              <span className="font-editorial italic text-title-md text-editorial-ink">
+                {promotion.data.rollupChainId}
+              </span>
+            </div>
+            {promotion.data.rollupRpc && (
+              <a
+                href={promotion.data.rollupRpc}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 font-mono text-body-sm text-secondary hover:text-editorial-ink"
+              >
+                {promotion.data.rollupRpc} <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {promotion.data.firstBlockTx && (
+              <span className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted break-all">
+                first_block_tx · {promotion.data.firstBlockTx}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Pipeline status grid */}
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="metric-card flex items-start gap-3 px-4 py-3">
-            <Chip tone="info" dense>done</Chip>
-            <div>
-              <div className="text-body-sm text-on-surface">Curve frozen</div>
-              <div className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                buy/sell reject with E_GRADUATED
-              </div>
-            </div>
-          </div>
-          <div className="metric-card flex items-start gap-3 px-4 py-3">
-            <Chip tone="info" dense>done</Chip>
-            <div>
-              <div className="text-body-sm text-on-surface">Reserve custodied</div>
-              <div className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                real umin in vault object
-              </div>
-            </div>
-          </div>
-          <div className="metric-card flex items-start gap-3 px-4 py-3">
-            <Chip tone="warning" dense>next</Chip>
-            <div>
-              <div className="text-body-sm text-on-surface">OPinit rollup spawn</div>
-              <div className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                liquidity_migrator::promote — Phase 3
-              </div>
-            </div>
-          </div>
-          <div className="metric-card flex items-start gap-3 px-4 py-3">
-            <Chip tone="warning" dense>next</Chip>
-            <div>
-              <div className="text-body-sm text-on-surface">InitiaDEX bootstrap</div>
-              <div className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                seed final_reserve MIN + final_supply ${ticker}
-              </div>
-            </div>
-          </div>
+          <PromotionItem tone="done" title="Curve frozen" detail="buy/sell reject with E_GRADUATED" />
+          <PromotionItem tone="done" title="Reserve custodied" detail="real umin in vault object" />
+          <PromotionItem
+            tone={promotion.data?.exists ? "done" : "idle"}
+            title="Promotion staged"
+            detail="liquidity_migrator::PromotionStaged emitted"
+          />
+          <PromotionItem
+            tone={promotion.data?.status === 1 ? "done" : "idle"}
+            title="Rollup live"
+            detail="weave rollup launch + record_rollup"
+          />
         </div>
       </section>
+    </div>
+  );
+}
+
+function PromotionItem({
+  tone,
+  title,
+  detail,
+}: {
+  tone: "done" | "idle" | "next";
+  title: string;
+  detail: string;
+}) {
+  const chipTone = tone === "done" ? "success" : tone === "idle" ? "neutral" : "warning";
+  const chipLabel = tone === "done" ? "done" : tone === "idle" ? "idle" : "next";
+  return (
+    <div className="metric-card flex items-start gap-3 px-4 py-3">
+      <Chip tone={chipTone} dense>
+        {chipLabel}
+      </Chip>
+      <div>
+        <div className="text-body-sm text-on-surface">{title}</div>
+        <div className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
+          {detail}
+        </div>
+      </div>
     </div>
   );
 }

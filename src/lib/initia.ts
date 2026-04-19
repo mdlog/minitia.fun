@@ -61,6 +61,8 @@ export interface AppchainChainConfig {
   apis: {
     rpc: Array<{ address: string }>;
     rest: Array<{ address: string }>;
+    indexer?: Array<{ address: string }>;
+    "json-rpc"?: Array<{ address: string }>;
   };
   metadata?: {
     minitia?: { type: "minimove" | "miniwasm" | "minievm"; version: string };
@@ -115,6 +117,9 @@ export const APPCHAIN_CHAIN: AppchainChainConfig | undefined = APPCHAIN_RPC_AVAI
       apis: {
         rpc: [{ address: APPCHAIN.rpc }],
         rest: [{ address: APPCHAIN.rest || APPCHAIN.rpc }],
+        // Kit's zm() extracts indexer unconditionally and throws "URL not
+        // found" if missing. We don't run a separate indexer; route to REST.
+        indexer: [{ address: APPCHAIN.rest || APPCHAIN.rpc }],
       },
       metadata: {
         minitia: { type: "minimove", version: "v1.1.11" },

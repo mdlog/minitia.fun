@@ -35,6 +35,18 @@ function shortAddr(s: string): string {
   return s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-6)}` : s;
 }
 
+/** Newton iteration integer sqrt for bigint — mirrors math128::sqrt on chain. */
+function bigintSqrt(n: bigint): bigint {
+  if (n < 2n) return n;
+  let x = n;
+  let y = (x + 1n) / 2n;
+  while (y < x) {
+    x = y;
+    y = (x + n / x) / 2n;
+  }
+  return x;
+}
+
 function relativeTime(height: number, latestHeight: number, blockTimeMs = 1000): string {
   const diff = (latestHeight - height) * blockTimeMs;
   if (diff < 5_000) return "just now";
@@ -73,18 +85,41 @@ export default function Trade() {
     return BigInt(Math.floor(n));
   }, [amount, side]);
 
-  // Estimate output
+  // Estimate output using the same integral linear-curve math the Move
+  // contract executes (bonding_curve.move tokens_out_for_buy/gross_for_sell):
+  //   spot_scaled = base*1e6 + slope*supply  (spot price * 1e6, integer)
+  //   BUY : x = (sqrt(spot_scaled^2 + 2*slope*1e6*net) - spot_scaled)/slope
+  //   SELL: gross = (2*spot_scaled*burn - slope*burn^2) / (2*1e6)
   const expectedOut = useMemo(() => {
     if (!pool.data || !pool.data.exists || amountMicro === 0n) return 0n;
-    const spot = pool.data.spotPrice; // micro-INIT per token
-    if (spot === 0n) return 0n;
+    const base = pool.data.basePrice;
+    const slope = pool.data.slope;
+    const s0 = pool.data.tokenSupply;
     const feeBps = 50n;
+    const spotScaled = base * 1_000_000n + slope * s0;
+
     if (side === "BUY") {
       const net = (amountMicro * (10000n - feeBps)) / 10000n;
-      return (net * 1_000_000n) / spot;
+      if (slope === 0n) {
+        return base === 0n ? net : (net * 1_000_000n) / base;
+      }
+      const disc = spotScaled * spotScaled + 2n * slope * 1_000_000n * net;
+      const root = bigintSqrt(disc);
+      if (root <= spotScaled) return 0n;
+      return (root - spotScaled) / slope;
     }
-    // SELL
-    const gross = (amountMicro * spot) / 1_000_000n;
+
+    // SELL: amountMicro is the burn count in integer token units.
+    const burn = amountMicro;
+    let gross: bigint;
+    if (slope === 0n) {
+      gross = (burn * base) / 1_000_000n;
+    } else {
+      const a = 2n * spotScaled * burn;
+      const b = slope * burn * burn;
+      gross = b >= a ? 0n : (a - b) / 2_000_000n;
+    }
+    if (gross > pool.data.initReserve) gross = pool.data.initReserve;
     return (gross * (10000n - feeBps)) / 10000n;
   }, [pool.data, amountMicro, side]);
 
@@ -148,14 +183,15 @@ export default function Trade() {
   }, [trades.data, latestHeight]);
 
   return (
-    <div className="flex flex-col gap-8 pb-6">
-      {/* Hero — pump.fun-scale ticker + live price */}
-      <section className="relative grain dotgrid rounded-[28px] surface-section overflow-hidden">
+    <div className="page-shell">
+      <section className="page-hero grain dotgrid overflow-hidden">
         <div className="relative px-6 py-8 md:px-10 md:py-10">
           <div className="flex flex-wrap items-start gap-6">
             <Avatar symbol={ticker} size="xl" className="shrink-0" />
             <div className="flex min-w-0 flex-1 flex-col gap-3">
-              {/* Massive editorial ticker */}
+              <span className="font-mono text-[0.62rem] uppercase tracking-[0.28em] text-editorial">
+                § trading desk
+              </span>
               <h1
                 className="flex items-end gap-4 leading-[0.82] text-editorial-ink"
                 style={{ fontSize: "clamp(3.5rem, 11vw, 9rem)" }}
@@ -168,7 +204,10 @@ export default function Trade() {
                 </span>
               </h1>
 
-              {/* Microstat badges */}
+              <p className="max-w-2xl text-body-md leading-relaxed text-on-surface-variant">
+                Follow spot price, liquidity, community flow, and execution inputs from one cleaner market surface.
+              </p>
+
               <div className="flex flex-wrap items-center gap-2">
                 {isHot && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-2.5 py-1 font-mono text-[0.62rem] font-medium uppercase tracking-[0.22em] text-amber-300">
@@ -197,7 +236,6 @@ export default function Trade() {
               </div>
             </div>
 
-            {/* Live price slab — right rail */}
             {pool.data?.exists && (
               <div className="flex shrink-0 flex-col items-end gap-3 lg:min-w-[320px]">
                 <div className="flex flex-col items-end gap-1">
@@ -270,7 +308,6 @@ export default function Trade() {
         </div>
       </section>
 
-      {/* No pool state */}
       {noPool && (
         <Card tier="base" padded="lg" className="flex flex-col gap-4">
           <div className="flex items-center gap-2 text-on-surface-variant">
@@ -315,7 +352,6 @@ export default function Trade() {
         </Card>
       )}
 
-      {/* Live stats + order panel */}
       {pool.data?.exists && (
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="flex flex-col gap-5">

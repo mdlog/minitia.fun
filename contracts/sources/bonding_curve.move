@@ -12,6 +12,7 @@ module minitia_fun::bonding_curve {
     use std::vector;
 
     use initia_std::event;
+    use initia_std::math128;
     use initia_std::table::{Self, Table};
 
     // ---- Errors ------------------------------------------------------------
@@ -162,11 +163,15 @@ module minitia_fun::bonding_curve {
         let fee = init_in * (FEE_BPS as u128) / (BPS_DENOM as u128);
         let net = init_in - fee;
 
-        // Linear curve: tokens_out approx = net / current_avg_price
-        // current_avg_price = base + (supply + tokens_out / 2) * slope / 1_000_000
-        // Simplification: use spot price at current supply, ignore slippage in math.
-        let spot = current_price_internal(pool);
-        let tokens_out = if (spot == 0) { net } else { net * 1_000_000 / spot };
+        // Integral linear curve: solve for x where
+        //     net = base*x + slope*x*(2*s0 + x)/(2*1_000_000)
+        // => slope*x^2 + 2*spot_scaled*x - 2*1_000_000*net = 0
+        // where spot_scaled = base*1_000_000 + slope*s0 (integer form of current price*1e6)
+        //
+        //     x = (sqrt(spot_scaled^2 + 2*slope*1_000_000*net) - spot_scaled) / slope
+        //
+        // slope == 0: degenerate flat curve, x = net*1_000_000/base.
+        let tokens_out = tokens_out_for_buy(pool, net);
         assert!(tokens_out >= (min_tokens_out as u128), error::invalid_state(E_SLIPPAGE));
 
         pool.init_reserve = pool.init_reserve + net;
@@ -227,8 +232,14 @@ module minitia_fun::bonding_curve {
         let burn = (token_amount as u128);
         assert!(burn <= prev, error::invalid_state(E_INSUFFICIENT_BALANCE));
 
-        let spot = current_price_internal(pool);
-        let gross = burn * spot / 1_000_000;
+        // Integral linear curve (inverse of buy):
+        //     gross = base*burn + slope*burn*(2*s0 - burn)/(2*1_000_000)
+        //           = (2*spot_scaled*burn - slope*burn^2) / (2*1_000_000)
+        // Clamp to pool.init_reserve so we never overdraw -- this protects
+        // existing pools whose supply was inflated by the Phase 1 shortcut
+        // math (reserve < integral implied by current supply).
+        let gross = gross_for_sell(pool, burn);
+        if (gross > pool.init_reserve) { gross = pool.init_reserve; };
         let fee = gross * (FEE_BPS as u128) / (BPS_DENOM as u128);
         let net = if (gross > fee) { gross - fee } else { 0 };
         assert!(net >= (min_init_out as u128), error::invalid_state(E_SLIPPAGE));
@@ -345,5 +356,44 @@ module minitia_fun::bonding_curve {
     fun current_price_internal(pool: &Pool): u128 {
         // price (micro-INIT per token) = base + supply * slope / 1_000_000
         pool.base_price + (pool.token_supply * pool.slope) / 1_000_000
+    }
+
+    /// Integral linear curve: how many tokens a buyer receives for depositing
+    /// `net` umin (after fee). Returns the positive root of the quadratic
+    /// derived from reserve = base*x + slope*x*(2*s0 + x)/(2*10^6).
+    fun tokens_out_for_buy(pool: &Pool, net: u128): u128 {
+        let slope = pool.slope;
+        let base = pool.base_price;
+        let s0 = pool.token_supply;
+        if (slope == 0) {
+            if (base == 0) { return net };
+            return net * 1_000_000 / base
+        };
+        // spot_scaled = base*1_000_000 + slope*s0. Equal to spot_price * 10^6.
+        let spot_scaled = base * 1_000_000 + slope * s0;
+        // disc = spot_scaled^2 + 2 * slope * 1_000_000 * net
+        let disc = spot_scaled * spot_scaled + 2 * slope * 1_000_000 * net;
+        let root = math128::sqrt(disc);
+        if (root <= spot_scaled) { return 0 };
+        (root - spot_scaled) / slope
+    }
+
+    /// Integral linear curve: gross umin owed when burning `burn` tokens from
+    /// current supply. Caller must clamp to pool.init_reserve when applying.
+    fun gross_for_sell(pool: &Pool, burn: u128): u128 {
+        let slope = pool.slope;
+        let base = pool.base_price;
+        let s0 = pool.token_supply;
+        if (burn == 0) { return 0 };
+        if (slope == 0) {
+            return burn * base / 1_000_000
+        };
+        // spot_scaled = base*10^6 + slope*s0
+        // gross = (2*spot_scaled*burn - slope*burn^2) / (2*10^6)
+        let spot_scaled = base * 1_000_000 + slope * s0;
+        let a = 2 * spot_scaled * burn;
+        let b = slope * burn * burn;
+        if (b >= a) { return 0 };
+        (a - b) / 2_000_000
     }
 }

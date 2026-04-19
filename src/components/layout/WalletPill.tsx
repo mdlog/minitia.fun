@@ -6,6 +6,7 @@ import { useTxHistory } from "@/hooks/useTxHistory";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { formatInitBalance, INITIA, shortAddress } from "@/lib/initia";
+import { hexToBech32, shortAddress as shortAny } from "@/lib/address";
 
 function formatAgo(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -30,6 +31,7 @@ export function WalletPill() {
   const {
     isConnected,
     initiaAddress,
+    hexAddress,
     username,
     balance,
     isBalanceLoading,
@@ -39,8 +41,13 @@ export function WalletPill() {
   } = useInitiaAccount();
   const { disconnect } = useDisconnect();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [copied, setCopied] = useState<"hex" | "bech32" | null>(null);
   const menuRef = useClickOutside(() => setMenuOpen(false));
   const history = useTxHistory(initiaAddress);
+
+  // If the wallet lib only exposed one form, derive the other from it.
+  const bech32 = initiaAddress ?? (hexAddress ? hexToBech32(hexAddress) : null);
+  const hex = hexAddress ?? null;
 
   if (!isConnected || !initiaAddress) {
     return (
@@ -64,8 +71,12 @@ export function WalletPill() {
         : "0.00"
       : formatInitBalance(balance);
 
-  const copyAddress = async () => {
-    await navigator.clipboard.writeText(initiaAddress);
+  const copy = async (form: "hex" | "bech32") => {
+    const value = form === "hex" ? hex : bech32;
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setCopied(form);
+    setTimeout(() => setCopied(null), 1200);
   };
 
   return (
@@ -99,13 +110,10 @@ export function WalletPill() {
       </button>
 
       {menuOpen && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-[20px] bg-surface-container-high ghost-border-strong shadow-ambient-lg py-3 animate-fade-in">
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-80 rounded-[20px] bg-surface-container-high ghost-border-strong shadow-ambient-lg py-3 animate-fade-in">
           <div className="px-4 pb-3">
             <div className="font-mono text-[0.62rem] uppercase tracking-[0.28em] text-on-surface-muted">
               Initia {INITIA.network}
-            </div>
-            <div className="mt-1 break-all font-mono text-body-sm text-on-surface">
-              {initiaAddress}
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="font-editorial italic text-headline-md leading-none text-editorial">
@@ -119,11 +127,32 @@ export function WalletPill() {
 
           <div className="h-px mx-4 bg-editorial/15" />
 
-          <MenuItem
-            icon={<Copy className="h-3.5 w-3.5" />}
-            label="Copy address"
-            onClick={copyAddress}
-          />
+          {/* Both address encodings — same 20 bytes, different UI conventions */}
+          <div className="flex flex-col gap-2 px-4 py-3">
+            {bech32 && (
+              <AddressRow
+                label="Cosmos · init1…"
+                value={bech32}
+                display={shortAny(bech32, 8)}
+                copied={copied === "bech32"}
+                onCopy={() => copy("bech32")}
+              />
+            )}
+            {hex && (
+              <AddressRow
+                label="EVM · 0x…"
+                value={hex}
+                display={shortAny(hex, 6)}
+                copied={copied === "hex"}
+                onCopy={() => copy("hex")}
+              />
+            )}
+            <span className="font-mono text-[0.55rem] uppercase tracking-[0.22em] text-on-surface-muted">
+              same account · different encoding
+            </span>
+          </div>
+
+          <div className="h-px mx-4 bg-editorial/15" />
           <MenuItem
             icon={<RefreshCcw className="h-3.5 w-3.5" />}
             label="Refresh balance"
@@ -205,6 +234,47 @@ export function WalletPill() {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function AddressRow({
+  label,
+  value,
+  display,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  display: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.04] px-3 py-2 ghost-border">
+      <div className="min-w-0 flex-1">
+        <div className="font-mono text-[0.56rem] uppercase tracking-[0.24em] text-on-surface-muted">
+          {label}
+        </div>
+        <div className="mt-0.5 font-mono text-body-sm text-on-surface" title={value}>
+          {display}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onCopy}
+        aria-label={`Copy ${label}`}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-on-surface-variant hover:bg-white/[0.12] hover:text-on-surface snappy"
+      >
+        {copied ? (
+          <span className="text-[0.58rem] font-mono uppercase tracking-[0.22em] text-secondary">
+            ok
+          </span>
+        ) : (
+          <Copy className="h-3 w-3" />
+        )}
+      </button>
     </div>
   );
 }

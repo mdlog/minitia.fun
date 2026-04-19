@@ -8,24 +8,8 @@ import { Chip } from "@/components/ui/Chip";
 import { useAllLaunchedTokens } from "@/hooks/useAllLaunchedTokens";
 import { useGlobalActivity } from "@/hooks/useGlobalActivity";
 import { APPCHAIN } from "@/lib/initia";
+import { addressEq, hexToBech32, shortAddress, toCanonicalHex } from "@/lib/address";
 import { cn } from "@/lib/cn";
-
-function normHex(raw: string | undefined): string {
-  if (!raw) return "";
-  const s = raw.toLowerCase();
-  return s.startsWith("0x") ? s : `0x${s}`;
-}
-
-function addrEq(a: string, b: string): boolean {
-  const na = a.toLowerCase().replace(/^0x/, "").padStart(40, "0");
-  const nb = b.toLowerCase().replace(/^0x/, "").padStart(40, "0");
-  return na === nb;
-}
-
-function shortAddr(addr: string): string {
-  if (!addr) return "";
-  return addr.length > 14 ? `${addr.slice(0, 8)}…${addr.slice(-6)}` : addr;
-}
 
 function formatInitFromUmin(umin: bigint, digits = 2): string {
   if (umin === 0n) return "0";
@@ -46,16 +30,18 @@ function relativeBlocks(height: number, latestHeight: number): string {
 
 export default function UserProfile() {
   const { address = "" } = useParams();
-  const userHex = normHex(address);
+  // Accept either `0x…` hex or `init1…` bech32; canonicalise for matching.
+  const userHex = toCanonicalHex(address) ?? "";
+  const userBech32 = userHex ? hexToBech32(userHex) : null;
   const tokens = useAllLaunchedTokens(50);
   const activity = useGlobalActivity(80);
 
   const launched = useMemo(
-    () => (tokens.data ?? []).filter((t) => addrEq(t.creator, userHex)),
+    () => (tokens.data ?? []).filter((t) => addressEq(t.creator, userHex)),
     [tokens.data, userHex],
   );
   const userActivity = useMemo(
-    () => (activity.data ?? []).filter((ev) => ev.actor && addrEq(ev.actor, userHex)),
+    () => (activity.data ?? []).filter((ev) => ev.actor && addressEq(ev.actor, userHex)),
     [activity.data, userHex],
   );
   const latestHeight = (activity.data ?? []).reduce((m, e) => (e.height > m ? e.height : m), 0);
@@ -95,8 +81,13 @@ export default function UserProfile() {
               className="font-editorial italic leading-[0.9] text-editorial-ink break-all"
               style={{ fontSize: "clamp(2rem, 5vw, 3.75rem)" }}
             >
-              {shortAddr(userHex)}
+              {shortAddress(userHex)}
             </h1>
+            {userBech32 && (
+              <p className="font-mono text-[0.68rem] text-on-surface-muted break-all">
+                bech32 · <span className="text-editorial-ink">{userBech32}</span>
+              </p>
+            )}
             <p className="font-mono text-body-sm text-on-surface-muted">
               Creator · trader · on <span className="text-editorial-ink">{APPCHAIN.chainId}</span>
             </p>

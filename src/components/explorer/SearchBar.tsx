@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, ExternalLink, Hash, Layers, Search, User2 } from "lucide-react";
 import { APPCHAIN } from "@/lib/initia";
+import { bech32ToHex, isBech32Address } from "@/lib/address";
 
 type Detected =
   | { kind: "empty" }
@@ -25,8 +26,8 @@ function detect(raw: string): Detected {
   const hexAddr = trimmed.match(/^0x[0-9a-fA-F]{40}$/);
   if (hexAddr) return { kind: "address_hex", address: trimmed.toLowerCase() };
 
-  // Bech32 address: init1 + base32 body. Accept length 38-58 just to be loose.
-  if (/^init1[0-9a-z]{30,70}$/.test(trimmed)) {
+  // Bech32 address: validate full checksum via cosmjs.
+  if (/^init1[0-9a-z]{30,70}$/.test(trimmed) && isBech32Address(trimmed)) {
     return { kind: "address_bech32", address: trimmed };
   }
 
@@ -79,10 +80,13 @@ export function ExplorerSearchBar() {
       case "address_hex":
         navigate(`/u/${d.address}`);
         return;
-      case "address_bech32":
-        // Bech32 users — profile expects hex; still let page handle it gracefully.
-        navigate(`/u/${d.address}`);
+      case "address_bech32": {
+        // Canonicalise to hex so the profile route is always 0x-prefixed;
+        // profile hooks compare events (which emit hex) against this value.
+        const hex = bech32ToHex(d.address);
+        navigate(`/u/${hex ?? d.address}`);
         return;
+      }
       case "ticker":
         navigate(`/trade/${d.ticker}`);
         return;

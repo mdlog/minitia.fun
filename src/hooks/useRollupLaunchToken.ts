@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
-import { SigningStargateClient, GasPrice, type DeliverTxResponse } from "@cosmjs/stargate";
+import { SigningStargateClient, GasPrice, AminoTypes, type DeliverTxResponse } from "@cosmjs/stargate";
 import { Registry } from "@cosmjs/proto-signing";
 import { defaultRegistryTypes } from "@cosmjs/stargate";
 import { MsgExecuteJSON } from "@initia/initia.proto/initia/move/v1/tx";
+import { aminoConverters as initiaAminoConverters, protoRegistry as initiaProtoRegistry } from "@initia/amino-converter";
 import { useInterwovenKit } from "@initia/interwovenkit-react";
 import { APPCHAIN, APPCHAIN_RPC_AVAILABLE } from "@/lib/initia";
 import { useToast } from "@/components/ui/Toast";
@@ -12,13 +13,25 @@ const MSG_EXECUTE_JSON_TYPE_URL = "/initia.move.v1.MsgExecuteJSON";
 
 type Registered = InstanceType<typeof Registry>;
 let cachedRegistry: Registered | null = null;
+let cachedAminoTypes: AminoTypes | null = null;
 
 function buildRegistry(): Registered {
   if (cachedRegistry) return cachedRegistry;
-  const registry = new Registry([...defaultRegistryTypes]);
+  // Merge default cosmos types + Initia's full proto registry (covers Move,
+  // OPinit, IBC, etc.) + an explicit MsgExecuteJSON entry for safety.
+  const registry = new Registry([...defaultRegistryTypes, ...initiaProtoRegistry]);
   registry.register(MSG_EXECUTE_JSON_TYPE_URL, MsgExecuteJSON);
   cachedRegistry = registry;
   return registry;
+}
+
+function buildAminoTypes(): AminoTypes {
+  if (cachedAminoTypes) return cachedAminoTypes;
+  // @initia/amino-converter ships converters for every Initia-native message,
+  // including /initia.move.v1.MsgExecuteJSON — without these, Keplr/Leap reject
+  // the sign request because they default to ADR-031 amino_json.
+  cachedAminoTypes = new AminoTypes({ ...initiaAminoConverters });
+  return cachedAminoTypes;
 }
 
 export interface LaunchTokenPayload {
@@ -87,11 +100,13 @@ export function useRollupLaunchToken() {
 
       try {
         const registry = buildRegistry();
+        const aminoTypes = buildAminoTypes();
         const client = await SigningStargateClient.connectWithSigner(
           APPCHAIN.rpc,
           offlineSigner,
           {
             registry,
+            aminoTypes,
             gasPrice: GasPrice.fromString(`0.15${APPCHAIN.denom}`),
           },
         );

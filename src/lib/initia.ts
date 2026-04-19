@@ -51,9 +51,29 @@ export const APPCHAIN = {
   deployedAddress: "0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80",
   rpc: import.meta.env.VITE_APPCHAIN_RPC ?? "",
   rest: import.meta.env.VITE_APPCHAIN_REST ?? "",
+  faucet: import.meta.env.VITE_APPCHAIN_FAUCET ?? "",
 };
 
 export const APPCHAIN_RPC_AVAILABLE = Boolean(APPCHAIN.rpc);
+export const APPCHAIN_FAUCET_AVAILABLE = Boolean(APPCHAIN.faucet);
+
+/** Fetch the user's umin balance on the rollup via REST. Returns 0 if the
+ *  account hasn't been touched on-chain yet (the classic "does not exist"
+ *  case we convert into a Get-MIN prompt). */
+export async function fetchAppchainUminBalance(address: string): Promise<bigint> {
+  if (!APPCHAIN.rest || !address) return 0n;
+  try {
+    const res = await fetch(
+      `${APPCHAIN.rest}/cosmos/bank/v1beta1/balances/${address}/by_denom?denom=${APPCHAIN.denom}`,
+      { signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return 0n;
+    const data = (await res.json()) as { balance?: { amount?: string } };
+    return BigInt(data.balance?.amount ?? "0");
+  } catch {
+    return 0n;
+  }
+}
 
 /** Message types we auto-sign for one-click trading (session keys). */
 export const AUTO_SIGN_MSG_TYPES = [

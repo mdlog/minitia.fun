@@ -44,6 +44,18 @@ Reproduce locally with [`DEPLOY.md`](DEPLOY.md). See [`contracts/README.md`](con
 
 **Frontend reads from the rollup live** via those public tunnels: the Discovery page's **"Our rollup, live"** card polls `/status` every 5 s for block height and `/tx_search` every 15 s for the on-chain launch count. Judges running `npm run dev` will see the rollup's real chain ID, height, and Move tx count update in real time — verifiable by hitting the tunnel URLs above.
 
+### Local MIN faucet (for judges with a fresh wallet)
+
+The Launchpad's `Launch on rollup` button submits a real `MsgExecuteJSON` against `token_factory::launch`. The signing wallet therefore needs a tiny balance of `umin` to pay gas. To fund an arbitrary `init1…` address:
+
+```bash
+node scripts/faucet-server.mjs     # drips 10 MIN per request from gas-station
+```
+
+The faucet listens on `http://localhost:8090`. Set `VITE_APPCHAIN_FAUCET=http://localhost:8090/faucet` in `.env.local` and the Launchpad will render a **Get 10 MIN** button next to the connected wallet's balance.
+
+Only the machine that holds the rollup's `gas-station` keyring can run the faucet. Remote judges either ask the submitter to drip (share their `init1…`) or import the `gas-station` mnemonic printed in the deployment logs (testnet only).
+
 ---
 
 ## 1. The Pitch

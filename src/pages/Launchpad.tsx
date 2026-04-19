@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ExternalLink, Globe, ImagePlus, Loader2, Rocket, Trash2, Wallet } from "lucide-react";
+import { CheckCircle2, Droplet, ExternalLink, Globe, ImagePlus, Loader2, Rocket, Trash2, Wallet } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -7,9 +7,15 @@ import { Chip } from "@/components/ui/Chip";
 import { Input } from "@/components/ui/Input";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Textarea } from "@/components/ui/Textarea";
+import { useAppchainBalance } from "@/hooks/useAppchainBalance";
+import { useAppchainFaucet } from "@/hooks/useAppchainFaucet";
 import { useInitiaAccount } from "@/hooks/useInitiaAccount";
 import { useRollupLaunchToken, type LaunchTokenResult } from "@/hooks/useRollupLaunchToken";
-import { APPCHAIN, APPCHAIN_RPC_AVAILABLE } from "@/lib/initia";
+import {
+  APPCHAIN,
+  APPCHAIN_FAUCET_AVAILABLE,
+  APPCHAIN_RPC_AVAILABLE,
+} from "@/lib/initia";
 
 const DRAFT_KEY = "minitia.launchpad_draft.v1";
 const MAX_LOGO_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -38,8 +44,10 @@ function loadDraft(): Draft {
 }
 
 export default function Launchpad() {
-  const { isConnected, openConnect } = useInitiaAccount();
+  const { isConnected, openConnect, initiaAddress } = useInitiaAccount();
   const { launch, isPending } = useRollupLaunchToken();
+  const balanceQuery = useAppchainBalance(initiaAddress);
+  const { drip, isPending: isDripping } = useAppchainFaucet();
   const initial = useMemo(loadDraft, []);
   const [name, setName] = useState(initial.name);
   const [ticker, setTicker] = useState(initial.ticker);
@@ -315,6 +323,40 @@ export default function Launchpad() {
               >
                 Connect wallet to launch
               </Button>
+            )}
+
+            {/* Faucet + balance status */}
+            {isConnected && APPCHAIN_RPC_AVAILABLE && (
+              <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.03] px-3 py-2.5">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                    your balance · {APPCHAIN.chainId}
+                  </span>
+                  <span className="font-editorial italic text-title-md text-editorial-ink">
+                    {balanceQuery.data !== undefined
+                      ? `${Number(balanceQuery.data) / 1e6} MIN`
+                      : "— MIN"}
+                  </span>
+                </div>
+                {APPCHAIN_FAUCET_AVAILABLE && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await drip();
+                      setTimeout(() => balanceQuery.refetch(), 2_000);
+                    }}
+                    disabled={isDripping}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-secondary-container/70 px-3 py-1.5 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-secondary hover:bg-secondary-container snappy disabled:opacity-50"
+                  >
+                    {isDripping ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Droplet className="h-3 w-3" />
+                    )}
+                    {isDripping ? "Dripping…" : "Get 10 MIN"}
+                  </button>
+                )}
+              </div>
             )}
 
             <div className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">

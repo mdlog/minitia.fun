@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
 @import "./styles/tokens.css";
 
 @tailwind base;
@@ -62,6 +61,47 @@
 }
 
 @layer components {
+  /* Editorial italic — the signature "minitia" / "graduate fast" voice */
+  .editorial-italic {
+    font-family: var(--font-editorial);
+    font-style: italic;
+    color: var(--editorial-ink);
+    letter-spacing: -0.01em;
+  }
+
+  /* Uppercase mono eyebrow — section markers, stat labels, tabs */
+  .eyebrow,
+  .label-md {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--on-surface-muted);
+  }
+  .label-sm {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* "§ 01" editorial numeral marker */
+  .section-marker {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--editorial);
+  }
+
+  /* Mono data — tabular numerals */
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
   .glass {
     background-color: rgb(24 24 27 / 0.72); /* zinc 900 */
     backdrop-filter: blur(24px);

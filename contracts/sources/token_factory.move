@@ -1,169 +1,161 @@
-/// Minitia.fun · token_factory
+/// Minitia.fun - token_factory
 /// ---------------------------------------------------------------------------
-/// Mints a new fungible token on the Minitia.fun launcher rollup and reserves
-/// its canonical `.fun.init` subdomain via the Initia Usernames module.
+/// Registry of fair-launched tokens on the minitia-fun-test-1 rollup.
 ///
-/// Object-centric: every launched token is represented by a Move Object that
-/// stores the metadata + the creator address + the initial supply. This gives
-/// us "illegal-mint safety" — the curve contract can only mint against an
-/// existing token object owned by the bonding_curve module.
+/// Each launch records: creator, ticker, name, description, and the canonical
+/// `ticker.fun.init` subdomain. The bonding_curve module consumes this data
+/// to route trades. This is the minimal on-chain logic used for the hackathon
+/// deploy - Phase 2 adds the full object-centric metadata + mint/burn refs.
 module minitia_fun::token_factory {
     use std::error;
     use std::signer;
     use std::string::{Self, String};
-    use std::option::{Self, Option};
+    use std::vector;
 
-    use initia_std::object::{Self, Object, ExtendRef};
-    use initia_std::fungible_asset::{Self, Metadata, MintRef, BurnRef, TransferRef};
-    use initia_std::primary_fungible_store;
+    use initia_std::event;
+    use initia_std::table::{Self, Table};
 
     // ---- Errors ------------------------------------------------------------
-    const E_ALREADY_LAUNCHED: u64 = 1;
-    const E_TICKER_TOO_LONG: u64 = 2;
-    const E_TICKER_EMPTY: u64 = 3;
-    const E_NAME_TOO_LONG: u64 = 4;
-    const E_NOT_CREATOR: u64 = 5;
+    const E_NOT_INITIALIZED: u64 = 1;
+    const E_ALREADY_INITIALIZED: u64 = 2;
+    const E_TICKER_TAKEN: u64 = 3;
+    const E_TICKER_EMPTY: u64 = 4;
+    const E_TICKER_TOO_LONG: u64 = 5;
+    const E_NOT_ADMIN: u64 = 6;
 
     // ---- Constants ---------------------------------------------------------
     const MAX_TICKER_LEN: u64 = 8;
-    const MAX_NAME_LEN: u64 = 32;
-    const DECIMALS: u8 = 6;
 
     // ---- Resources ---------------------------------------------------------
 
-    /// Stored on the token Object — holds the refs that let the bonding_curve
-    /// module mint/burn supply during the fair-launch phase.
-    struct TokenRefs has key {
-        extend_ref: ExtendRef,
-        mint_ref: MintRef,
-        burn_ref: BurnRef,
-        transfer_ref: TransferRef,
+    /// Global registry of launched tokens, keyed by ticker string.
+    struct Registry has key {
+        admin: address,
+        tokens: Table<String, TokenInfo>,
+        count: u64,
     }
 
-    /// Public token info — read off-chain for the UI.
-    struct TokenInfo has key {
+    /// Per-token info.
+    struct TokenInfo has store, copy, drop {
         creator: address,
         ticker: String,
+        name: String,
+        description: String,
         subdomain: String,
         graduated: bool,
+        launch_index: u64,
     }
 
     // ---- Events ------------------------------------------------------------
     #[event]
     struct TokenLaunched has drop, store {
+        creator: address,
         ticker: String,
         name: String,
-        creator: address,
-        metadata: address,
         subdomain: String,
+        launch_index: u64,
+    }
+
+    #[event]
+    struct TokenGraduated has drop, store {
+        ticker: String,
+        launch_index: u64,
+    }
+
+    // ---- Init --------------------------------------------------------------
+
+    /// Publish the registry. Only the module owner (the account the module is
+    /// deployed under) should call this once at deployment time.
+    public entry fun initialize(owner: &signer) {
+        let addr = signer::address_of(owner);
+        assert!(!exists<Registry>(addr), error::already_exists(E_ALREADY_INITIALIZED));
+        move_to(owner, Registry {
+            admin: addr,
+            tokens: table::new<String, TokenInfo>(),
+            count: 0,
+        });
     }
 
     // ---- Entry -------------------------------------------------------------
 
-    /// Launch a new token. Called by the frontend through a single
-    /// `MsgExecute` that the user signs once (Auto-sign session key covers
-    /// any subsequent trades automatically).
+    /// Launch a new token on the registry. Any address can launch - there is
+    /// no permissioning at the launcher level. Economic guardrails live in the
+    /// bonding_curve module.
     public entry fun launch(
         creator: &signer,
-        name: String,
+        registry_addr: address,
         ticker: String,
+        name: String,
         description: String,
-        icon_uri: String,
-    ) {
-        assert_valid_metadata(&name, &ticker);
+    ) acquires Registry {
+        assert_valid_ticker(&ticker);
+        assert!(exists<Registry>(registry_addr), error::not_found(E_NOT_INITIALIZED));
 
-        let constructor_ref = object::create_named_object(
-            creator,
-            bytes_of_ticker(&ticker),
-        );
+        let registry = borrow_global_mut<Registry>(registry_addr);
+        assert!(!table::contains(&registry.tokens, ticker), error::already_exists(E_TICKER_TAKEN));
 
-        primary_fungible_store::create_primary_store_enabled_fungible_asset(
-            &constructor_ref,
-            option::none(),
-            name,
-            ticker,
-            DECIMALS,
-            icon_uri,
-            string::utf8(b"https://minitia.fun"),
-        );
-
-        let extend_ref = object::generate_extend_ref(&constructor_ref);
-        let mint_ref = fungible_asset::generate_mint_ref(&constructor_ref);
-        let burn_ref = fungible_asset::generate_burn_ref(&constructor_ref);
-        let transfer_ref = fungible_asset::generate_transfer_ref(&constructor_ref);
-
-        let metadata_signer = object::generate_signer(&constructor_ref);
-        let metadata_addr = signer::address_of(&metadata_signer);
         let subdomain = build_subdomain(&ticker);
-
-        move_to(&metadata_signer, TokenRefs {
-            extend_ref,
-            mint_ref,
-            burn_ref,
-            transfer_ref,
-        });
-
-        move_to(&metadata_signer, TokenInfo {
+        let launch_index = registry.count + 1;
+        let info = TokenInfo {
             creator: signer::address_of(creator),
             ticker,
-            subdomain: subdomain,
+            name,
+            description,
+            subdomain,
             graduated: false,
-        });
+            launch_index,
+        };
+
+        table::add(&mut registry.tokens, ticker, info);
+        registry.count = launch_index;
 
         event::emit(TokenLaunched {
+            creator: signer::address_of(creator),
             ticker,
             name,
-            creator: signer::address_of(creator),
-            metadata: metadata_addr,
             subdomain,
+            launch_index,
         });
+    }
 
-        // After this point, bonding_curve::initialize is called by the
-        // launcher orchestrator to seed the curve state against this Object.
-        let _ = description;
+    /// Mark a token as graduated. Admin-only (the module owner; in production
+    /// this would be the bonding_curve module via a capability).
+    public entry fun mark_graduated(
+        admin: &signer,
+        registry_addr: address,
+        ticker: String,
+    ) acquires Registry {
+        let registry = borrow_global_mut<Registry>(registry_addr);
+        assert!(signer::address_of(admin) == registry.admin, error::permission_denied(E_NOT_ADMIN));
+        let info_ref = table::borrow_mut(&mut registry.tokens, ticker);
+        info_ref.graduated = true;
+        event::emit(TokenGraduated {
+            ticker,
+            launch_index: info_ref.launch_index,
+        });
     }
 
     // ---- View --------------------------------------------------------------
 
     #[view]
-    public fun info(metadata: Object<Metadata>): (address, String, String, bool) acquires TokenInfo {
-        let info = borrow_global<TokenInfo>(object::object_address(&metadata));
-        (info.creator, info.ticker, info.subdomain, info.graduated)
+    public fun count(registry_addr: address): u64 acquires Registry {
+        if (!exists<Registry>(registry_addr)) { return 0 };
+        borrow_global<Registry>(registry_addr).count
     }
 
-    // ---- Friend-only -------------------------------------------------------
-    // bonding_curve consumes these during trade/graduation.
-
-    friend minitia_fun::bonding_curve;
-    friend minitia_fun::liquidity_migrator;
-
-    public(friend) fun mint_ref(metadata: Object<Metadata>): MintRef acquires TokenRefs {
-        let refs = borrow_global<TokenRefs>(object::object_address(&metadata));
-        refs.mint_ref
-    }
-
-    public(friend) fun burn_ref(metadata: Object<Metadata>): BurnRef acquires TokenRefs {
-        let refs = borrow_global<TokenRefs>(object::object_address(&metadata));
-        refs.burn_ref
-    }
-
-    public(friend) fun mark_graduated(metadata: Object<Metadata>) acquires TokenInfo {
-        let info = borrow_global_mut<TokenInfo>(object::object_address(&metadata));
-        info.graduated = true;
+    #[view]
+    public fun info(registry_addr: address, ticker: String): TokenInfo acquires Registry {
+        let registry = borrow_global<Registry>(registry_addr);
+        *table::borrow(&registry.tokens, ticker)
     }
 
     // ---- Internal ----------------------------------------------------------
 
-    fun assert_valid_metadata(name: &String, ticker: &String) {
-        let nlen = string::length(name);
-        let tlen = string::length(ticker);
-        assert!(tlen > 0, error::invalid_argument(E_TICKER_EMPTY));
-        assert!(tlen <= MAX_TICKER_LEN, error::invalid_argument(E_TICKER_TOO_LONG));
-        assert!(nlen <= MAX_NAME_LEN, error::invalid_argument(E_NAME_TOO_LONG));
-    }
-
-    fun bytes_of_ticker(ticker: &String): vector<u8> {
-        *string::bytes(ticker)
+    fun assert_valid_ticker(ticker: &String) {
+        let bytes = string::bytes(ticker);
+        let len = vector::length(bytes);
+        assert!(len > 0, error::invalid_argument(E_TICKER_EMPTY));
+        assert!(len <= MAX_TICKER_LEN, error::invalid_argument(E_TICKER_TOO_LONG));
     }
 
     fun build_subdomain(ticker: &String): String {

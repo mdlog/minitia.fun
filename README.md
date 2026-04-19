@@ -26,7 +26,19 @@ Minitia.fun is a fair-launch appchain launcher on Initia where anyone mints a to
 3. `npm run dev` — dev server at `http://localhost:5173`. Grab testnet INIT from [`faucet.testnet.initia.xyz`](https://faucet.testnet.initia.xyz) when the in-app banner prompts.
 4. Connect via Keplr / Leap / MetaMask / Privy, then click **Deploy Token** on the Launchpad page or **Buy $MOVE — one-click** on the Trade page to submit a real transaction on `initiation-2`. Tx hash appears as a toast with an explorer link and is persisted in your wallet dropdown's "Recent activity".
 
-See [`DEPLOY.md`](DEPLOY.md) for the checklist of steps to finalise the submission (deploy Move modules to our own rollup, fill `deployed_address` and `commit_sha` in [`.initia/submission.json`](.initia/submission.json), record demo video).
+### On-chain proof (deployed and verified)
+
+| Artefact | Value |
+|---|---|
+| **Rollup chain ID** | `minitia-fun-test-1` (Move VM, Initia DA) |
+| **Rollup RPC** (local) | `tcp://localhost:36657` |
+| **Deployed module address** | `0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80` (aka `init1czna6myw50xttzp3k2rcldekttmmukuqcu4u6c`) |
+| **Deploy tx** | `579664878BB873C8FAFE50350599D4ED54B9F6B46F4107157FDB3B28A638F0D1` (height 60, gas 243,342) |
+| **Registry init tx** | `E5767637DA582D4141BB0DC6AC6D85EBB6E36C276365CA9CE5066D0F7971C308` (height 62) |
+| **First `launch` tx ($MOVE)** | `CC1641D82204C999C0D789371BCEEAB29377DC80D678CEDA0A804394F357FC98` (height 64) |
+| **Registry count (on-chain view)** | `1` (verified via `minitiad query move view … token_factory count`) |
+
+Reproduce locally with [`DEPLOY.md`](DEPLOY.md). See [`contracts/README.md`](contracts/README.md) for the Move build / deploy commands.
 
 ---
 

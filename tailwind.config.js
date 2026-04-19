@@ -58,8 +58,8 @@ export default {
         },
       },
       fontFamily: {
-        editorial: ["'Inter'", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ["'Inter'", "ui-sans-serif", "system-ui", "sans-serif"],
+        editorial: ["'Instrument Serif'", "'Iowan Old Style'", "Georgia", "serif"],
+        display: ["'Bricolage Grotesque'", "'Inter'", "ui-sans-serif", "system-ui", "sans-serif"],
         sans: ["'Inter'", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
       },
@@ -87,6 +87,7 @@ export default {
         lg: "0.5rem",
         xl: "0.75rem",
         "2xl": "1rem",
+        hero: "28px",
       },
       boxShadow: {
         ambient: "0 10px 24px rgba(0, 0, 0, 0.25)",

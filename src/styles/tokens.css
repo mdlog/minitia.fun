@@ -77,4 +77,31 @@
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-slow: 400ms;
+
+  /* ---- Ghost borders (inset hairlines — signature look) ---- */
+  --ghost-border: inset 0 0 0 1px rgb(255 255 255 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.03);
+  --ghost-border-strong: inset 0 0 0 1px rgb(255 255 255 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.04);
+
+  /* ---- Radii ---- */
+  --radius-sm: 0.125rem;
+  --radius: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-card: 1.25rem;
+  --radius-hero: 28px;
+
+  /* ---- Type families ---- */
+  --font-editorial: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-display: "Bricolage Grotesque", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* ---- Avatar conic "moonlight" gradients (reserved for token avatars) ---- */
+  --avatar-conic-1: conic-gradient(from 120deg, #BA9EFF, #FF59E3, #00EEFC, #BA9EFF);
+  --avatar-conic-2: conic-gradient(from 0deg, #FF59E3, #8455EF, #00EEFC, #FF59E3);
+  --avatar-conic-3: conic-gradient(from 240deg, #00EEFC, #BA9EFF, #FF59E3, #00EEFC);
 }

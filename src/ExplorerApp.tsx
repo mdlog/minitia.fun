@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { ExplorerShell } from "@/components/layout/ExplorerShell";
 
-const Explorer = lazy(() => import("@/pages/Explorer"));
+const ExplorerHome = lazy(() => import("@/pages/ExplorerHome"));
 const TxDetail = lazy(() => import("@/pages/TxDetail"));
 const BlockDetail = lazy(() => import("@/pages/BlockDetail"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
@@ -32,7 +32,7 @@ export default function ExplorerApp() {
     <ExplorerShell>
       <Suspense fallback={<Fallback />}>
         <Routes>
-          <Route path="/" element={<Explorer />} />
+          <Route path="/" element={<ExplorerHome />} />
           <Route path="/explorer" element={<Navigate to="/" replace />} />
           <Route path="/tx/:hash" element={<TxDetail />} />
           <Route path="/block/:height" element={<BlockDetail />} />

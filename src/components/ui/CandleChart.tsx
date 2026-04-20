@@ -1,134 +1,135 @@
-import type { Candle } from "@/data/mock";
+import { useMemo } from "react";
 import { cn } from "@/lib/cn";
+import type { Candle } from "@/hooks/usePriceSeries";
+
+function formatPrice(microInit: number): string {
+  if (microInit === 0) return "0.000000";
+  const init = microInit / 1_000_000;
+  // keep 6 significant decimals for micro-priced tokens
+  if (init < 0.0001) return init.toFixed(8);
+  if (init < 0.1) return init.toFixed(6);
+  if (init < 100) return init.toFixed(4);
+  return init.toFixed(2);
+}
 
 export function CandleChart({
   data,
+  height = 340,
   className,
-  height = 320,
 }: {
   data: Candle[];
-  className?: string;
   height?: number;
+  className?: string;
 }) {
-  const allHighs = data.map((d) => d.high);
-  const allLows = data.map((d) => d.low);
-  const max = Math.max(...allHighs);
-  const min = Math.min(...allLows);
-  const range = max - min || 1;
+  const { max, min, range } = useMemo(() => {
+    if (data.length === 0) return { max: 1, min: 0, range: 1 };
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (const c of data) {
+      if (c.high > hi) hi = c.high;
+      if (c.low < lo) lo = c.low;
+    }
+    const r = hi - lo || hi * 0.05 || 1;
+    // Pad 5% top/bottom for breathing room.
+    return { max: hi + r * 0.05, min: Math.max(0, lo - r * 0.05), range: r * 1.1 };
+  }, [data]);
 
   const y = (v: number) => ((max - v) / range) * 100;
 
-  const closes = data.map((d) => d.close);
-  const last = closes[closes.length - 1];
-  const first = closes[0];
-  const trendUp = last >= first;
+  if (data.length === 0) {
+    return (
+      <div
+        className={cn(
+          "relative w-full overflow-hidden rounded-lg bg-[#0A0A0C] ghost-border flex items-center justify-center",
+          className,
+        )}
+        style={{ height }}
+      >
+        <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-on-surface-muted">
+          No trades in this window
+        </span>
+      </div>
+    );
+  }
+
+  const axisLabels = [0, 0.25, 0.5, 0.75, 1].map((f) => max - f * range);
 
   return (
     <div
-      className={cn("relative w-full surface-nested rounded overflow-hidden", className)}
+      className={cn(
+        "relative w-full overflow-hidden rounded-lg bg-[#0A0A0C] ghost-border",
+        className,
+      )}
       style={{ height }}
     >
-      {/* Horizontal grid lines (tonal) */}
-      <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="h-px w-full bg-outline-variant/30"
-            style={{ opacity: i === 0 || i === 4 ? 0 : 1 }}
-          />
-        ))}
-      </div>
-
-      {/* Trend overlay line (svg polyline) */}
+      {/* Grid */}
       <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
+        className="pointer-events-none absolute inset-0 h-full w-full"
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
       >
+        {[20, 40, 60, 80].map((gy) => (
+          <line
+            key={gy}
+            x1="0"
+            y1={gy}
+            x2="100"
+            y2={gy}
+            stroke="rgba(255,255,255,0.04)"
+            strokeWidth="0.2"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
         <defs>
           <linearGradient id="trendGrad" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#5B8CFF" stopOpacity="0.34" />
-            <stop offset="100%" stopColor="#5B8CFF" stopOpacity="0" />
+            <stop offset="0%" stopColor="#10B981" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <polyline
-          points={data
-            .map((d, i) => `${(i / (data.length - 1)) * 100},${y(d.close)}`)
-            .join(" ")}
-          fill="none"
-          stroke="#5B8CFF"
-          strokeWidth="0.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
         <polygon
-          points={
-            `0,100 ${data
-              .map((d, i) => `${(i / (data.length - 1)) * 100},${y(d.close)}`)
-              .join(" ")} 100,100`
-          }
+          points={`0,100 ${data
+            .map((c, i) => `${(i / Math.max(1, data.length - 1)) * 100},${y(c.close)}`)
+            .join(" ")} 100,100`}
           fill="url(#trendGrad)"
         />
       </svg>
 
       {/* Candles */}
-      <div className="absolute inset-0 flex items-stretch gap-[3px] px-2 py-2">
+      <div className="absolute inset-0 flex items-stretch gap-[3px] px-3 py-3 pr-14">
         {data.map((c, i) => {
-          const bullish = c.close >= c.open;
-          const bodyTop = y(Math.max(c.open, c.close));
-          const bodyBottom = y(Math.min(c.open, c.close));
-          const wickTop = y(c.high);
-          const wickBottom = y(c.low);
+          const bull = c.close >= c.open;
+          const bt = y(Math.max(c.open, c.close));
+          const bb = y(Math.min(c.open, c.close));
+          const wt = y(c.high);
+          const wb = y(c.low);
           return (
-            <div key={i} className="relative flex-1 h-full">
-              {/* Wick */}
+            <div key={i} className="relative h-full flex-1">
               <div
                 className={cn(
-                  "absolute left-1/2 -translate-x-1/2 w-[2px] rounded-full",
-                  bullish ? "bg-secondary/70" : "bg-error/70",
+                  "absolute left-1/2 w-[1.5px] -translate-x-1/2",
+                  bull ? "bg-[#10B981]" : "bg-[#E11D48]",
                 )}
-                style={{
-                  top: `${wickTop}%`,
-                  height: `${wickBottom - wickTop}%`,
-                }}
+                style={{ top: `${wt}%`, height: `${wb - wt}%`, opacity: 0.6 }}
               />
-              {/* Body */}
               <div
                 className={cn(
-                  "absolute left-0 right-0 rounded-sm",
-                  bullish ? "bg-secondary" : "bg-error",
-                  bullish && "shadow-[0_0_10px_rgba(47,197,164,0.24)]",
+                  "absolute left-0 right-0 rounded-[1px]",
+                  bull ? "bg-[#10B981]" : "bg-[#E11D48]",
                 )}
-                style={{
-                  top: `${bodyTop}%`,
-                  height: `${Math.max(bodyBottom - bodyTop, 1.5)}%`,
-                }}
+                style={{ top: `${bt}%`, height: `${Math.max(bb - bt, 1.5)}%` }}
               />
             </div>
           );
         })}
       </div>
 
-      {/* Live price marker */}
-      <div
-        className="absolute right-0 flex items-center gap-2"
-        style={{ top: `${y(last)}%`, transform: "translateY(-50%)" }}
-      >
-        <div
-          className={cn(
-            "h-px flex-1 w-20",
-            trendUp ? "bg-secondary" : "bg-error",
-          )}
-        />
-        <span
-          className={cn(
-            "font-mono text-label-sm px-1.5 py-0.5 rounded-sm",
-            trendUp ? "bg-secondary text-surface" : "bg-error text-on-error",
-          )}
-        >
-          {last.toFixed(6)}
-        </span>
+      {/* Price axis */}
+      <div className="pointer-events-none absolute right-0 top-0 flex h-full w-12 flex-col justify-between py-3 pr-2 text-right">
+        {axisLabels.map((p, i) => (
+          <span key={i} className="font-mono text-[10px] tabular-nums text-[#52525B]">
+            {formatPrice(p)}
+          </span>
+        ))}
       </div>
     </div>
   );

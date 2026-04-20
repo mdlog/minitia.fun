@@ -18,9 +18,13 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { CandleChart } from "@/components/ui/CandleChart";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
+import { CurveDepthChart } from "@/components/ui/CurveDepthChart";
+import { Delta } from "@/components/ui/Delta";
 import { ProgressBar } from "@/components/ui/ProgressBar";
+import { Segmented } from "@/components/ui/Segmented";
 import { Stat } from "@/components/ui/Stat";
 import { useInitiaAccount } from "@/hooks/useInitiaAccount";
 import { useAppchainBalance } from "@/hooks/useAppchainBalance";
@@ -31,6 +35,7 @@ import { useRecentTrades } from "@/hooks/useRecentTrades";
 import { useComments, useCommentPost } from "@/hooks/useComments";
 import { useCreatePoolAction } from "@/hooks/useCreatePoolAction";
 import { useHolderLeaderboard } from "@/hooks/useHolderLeaderboard";
+import { usePriceSeries, type Timeframe } from "@/hooks/usePriceSeries";
 import { APPCHAIN } from "@/lib/initia";
 import { cn } from "@/lib/cn";
 
@@ -88,7 +93,16 @@ export default function Trade() {
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [amount, setAmount] = useState("0.5");
   const [slippage, setSlippage] = useState<number>(1);
-  const [tab, setTab] = useState<"trades" | "holders" | "comments">("trades");
+  const [tab, setTab] = useState<"trades" | "holders" | "comments" | "depth">("trades");
+  const [timeframe, setTimeframe] = useState<Timeframe>("1H");
+
+  const priceSeries = usePriceSeries(ticker, timeframe, pool.data?.spotPrice);
+
+  const marketCapMicroInit = useMemo(() => {
+    if (!pool.data?.exists) return 0n;
+    // spotPrice (umin/token) * supply (whole tokens) = umin market cap
+    return pool.data.spotPrice * pool.data.tokenSupply;
+  }, [pool.data]);
 
   const amountMicro = useMemo(() => {
     const n = parseFloat(amount || "0");
@@ -230,21 +244,31 @@ export default function Trade() {
                 unit="MIN"
                 tone="info"
               />
+              <div className="flex flex-col gap-1">
+                <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-on-surface-muted">
+                  24h
+                </span>
+                <span className="flex items-baseline">
+                  {priceSeries.priceChange24hPct !== null ? (
+                    <Delta value={priceSeries.priceChange24hPct} className="text-[18px]" />
+                  ) : (
+                    <span className="font-mono text-[18px] text-on-surface-muted tabular-nums">
+                      —
+                    </span>
+                  )}
+                </span>
+              </div>
               <Stat
-                label="Liquidity"
-                value={formatMin(pool.data.initReserve, 2)}
+                label="24h Vol"
+                value={formatMin(priceSeries.vol24h, 2)}
                 unit="MIN"
               />
               <Stat
-                label="Supply"
-                value={Number(pool.data.tokenSupply).toLocaleString()}
-                unit={`$${ticker}`}
+                label="Mkt cap"
+                value={formatMin(marketCapMicroInit / 1_000_000n, 2)}
+                unit="MIN"
               />
-              <Stat
-                label="Trades"
-                value={pool.data.tradeCount.toLocaleString()}
-              />
-              <div className="ml-auto flex min-w-[180px] flex-col items-end gap-1.5">
+              <div className="ml-auto flex min-w-[200px] flex-col items-end gap-1.5">
                 <div className="flex items-center gap-2 text-[11px]">
                   <span className="text-on-surface-muted">Graduation</span>
                   <span className="font-mono tabular-nums text-on-surface">
@@ -253,7 +277,8 @@ export default function Trade() {
                 </div>
                 <ProgressBar value={graduationProgress} tone="primary" size="sm" />
                 <span className="font-mono text-[10.5px] text-[#52525B]">
-                  {formatMin(pool.data.initReserve, 2)} / 10 MIN
+                  {formatMin(pool.data.initReserve, 2)} /{" "}
+                  {formatMin(GRADUATION_THRESHOLD_INIT, 0)} MIN
                 </span>
               </div>
             </>
@@ -320,7 +345,35 @@ export default function Trade() {
       {pool.data?.exists && (
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="flex min-w-0 flex-col gap-4">
-            {/* Tabs card: trades / holders / comments */}
+            {/* Chart card */}
+            <Card padded="md" className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <Segmented
+                  value={timeframe}
+                  onChange={(v) => setTimeframe(v as Timeframe)}
+                  options={[
+                    { value: "5m", label: "5m" },
+                    { value: "1H", label: "1H" },
+                    { value: "4H", label: "4H" },
+                    { value: "1D", label: "1D" },
+                    { value: "1W", label: "1W" },
+                  ]}
+                  size="xs"
+                />
+                <div className="flex items-center gap-3 text-[11px]">
+                  <span className="text-on-surface-muted">
+                    {priceSeries.candles.length} candle
+                    {priceSeries.candles.length === 1 ? "" : "s"}
+                  </span>
+                  {priceSeries.isFetching && (
+                    <Loader2 className="h-3 w-3 animate-spin text-on-surface-muted" />
+                  )}
+                </div>
+              </div>
+              <CandleChart data={priceSeries.candles} height={320} />
+            </Card>
+
+            {/* Tabs card: trades / holders / comments / depth */}
             <Card padded="none" className="overflow-hidden">
               <div className="flex items-center gap-4 border-b border-white/[0.05] px-4">
                 {(
@@ -328,6 +381,7 @@ export default function Trade() {
                     { k: "trades", label: "Recent trades" },
                     { k: "holders", label: "Holders" },
                     { k: "comments", label: "Comments" },
+                    { k: "depth", label: "Curve depth" },
                   ] as const
                 ).map((t) => (
                   <button
@@ -571,6 +625,48 @@ export default function Trade() {
                         ))}
                       </div>
                     )}
+                  </div>
+                )}
+                {tab === "depth" && (
+                  <div className="flex flex-col gap-3">
+                    <CurveDepthChart
+                      basePriceMicroInit={pool.data.basePrice}
+                      slopeMicroInit={pool.data.slope}
+                      currentSupply={pool.data.tokenSupply}
+                      currentReserveMicroInit={pool.data.initReserve}
+                      graduationTargetMicroInit={GRADUATION_THRESHOLD_INIT}
+                      height={280}
+                    />
+                    <p className="text-[12px] leading-[1.55] text-on-surface-variant">
+                      Bonding curve pools have no orderbook — price is a deterministic function
+                      of token supply:{" "}
+                      <code className="font-mono text-on-surface">
+                        spot = base + (supply × slope) / 1e6
+                      </code>
+                      . The blue line shows that function across the full supply range; the
+                      yellow marker is current supply, the green marker is approximate supply
+                      at graduation.
+                    </p>
+                    <div className="grid grid-cols-3 gap-3 border-t border-white/[0.05] pt-3 text-[11px]">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-on-surface-muted">Base price</span>
+                        <span className="font-mono tabular-nums text-on-surface">
+                          {formatMin(pool.data.basePrice, 6)} MIN
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-on-surface-muted">Slope</span>
+                        <span className="font-mono tabular-nums text-on-surface">
+                          {formatMin(pool.data.slope, 6)} MIN/token
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-on-surface-muted">Reserve custody</span>
+                        <span className="font-mono tabular-nums text-on-surface">
+                          {formatMin(pool.data.initReserve, 2)} MIN
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

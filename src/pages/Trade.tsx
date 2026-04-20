@@ -35,6 +35,7 @@ import { useRecentTrades } from "@/hooks/useRecentTrades";
 import { useComments, useCommentPost } from "@/hooks/useComments";
 import { useCreatePoolAction } from "@/hooks/useCreatePoolAction";
 import { useHolderLeaderboard } from "@/hooks/useHolderLeaderboard";
+import { useAllLaunchedTokens } from "@/hooks/useAllLaunchedTokens";
 import { usePriceSeries, type Timeframe } from "@/hooks/usePriceSeries";
 import { APPCHAIN } from "@/lib/initia";
 import { cn } from "@/lib/cn";
@@ -74,11 +75,26 @@ function relativeTime(height: number, latestHeight: number, blockTimeMs = 1000):
   return `${Math.round(diff / 3_600_000)}h ago`;
 }
 
+function addrEq(a: string, b: string): boolean {
+  const na = a.toLowerCase().replace(/^0x/, "").padStart(40, "0");
+  const nb = b.toLowerCase().replace(/^0x/, "").padStart(40, "0");
+  return na === nb;
+}
+
 export default function Trade() {
   const { symbol = "MOVE" } = useParams();
   const ticker = symbol.toUpperCase();
   const { isConnected, openConnect, initiaAddress, hexAddress } = useInitiaAccount();
   const pool = usePoolState(ticker);
+  const tokensIndex = useAllLaunchedTokens(50);
+  const launcherAddr = useMemo(
+    () => tokensIndex.data?.find((t) => t.ticker === ticker)?.creator ?? "",
+    [tokensIndex.data, ticker],
+  );
+  const isLauncher = useMemo(
+    () => Boolean(hexAddress && launcherAddr && addrEq(launcherAddr, hexAddress)),
+    [hexAddress, launcherAddr],
+  );
   const holding = useUserHolding(hexAddress, ticker);
   const wallet = useAppchainBalance(initiaAddress);
   const trades = useRecentTrades(ticker, 25);
@@ -314,30 +330,51 @@ export default function Trade() {
               No bonding curve pool exists for ${ticker}
             </span>
           </div>
-          <p className="max-w-2xl text-[12.5px] text-on-surface-variant">
-            This ticker was launched via <code className="font-mono">token_factory</code> before
-            Launchpad started bundling pool creation. Open a curve with default parameters
-            (base_price=1000, slope=10) to enable trading. Permissionless — any wallet can do it.
+          <p className="max-w-2xl text-[12.5px] leading-[1.55] text-on-surface-variant">
+            This ticker was launched via <code className="font-mono">token_factory</code> but
+            its bonding-curve pool hasn't been opened yet. Whoever opens the pool becomes the
+            pool creator — they'll receive the 0.5% trading fees and own the appchain
+            promotion flow. To keep ownership aligned, this button is gated to the original
+            launcher's wallet.
           </p>
+          {launcherAddr && (
+            <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
+              <span className="text-on-surface-muted">Launcher wallet:</span>
+              <Link
+                to={`/u/${launcherAddr}`}
+                className="font-mono text-[#60A5FA] hover:text-on-surface"
+                title={launcherAddr}
+              >
+                {shortAddr(launcherAddr)}
+              </Link>
+              {isLauncher && <Chip tone="success" dot>Connected</Chip>}
+            </div>
+          )}
           <div>
-            <Button
-              variant="primary"
-              leading={
-                isCreatingPool ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Zap className="h-3.5 w-3.5" />
-                )
-              }
-              disabled={isCreatingPool || !isConnected}
-              onClick={async () => {
-                if (!isConnected) return openConnect();
-                const hash = await createPool(ticker);
-                if (hash) setTimeout(() => pool.refetch(), 1500);
-              }}
-            >
-              {isCreatingPool ? "Opening curve…" : `Open curve for $${ticker}`}
-            </Button>
+            {isLauncher || !launcherAddr ? (
+              <Button
+                variant="primary"
+                leading={
+                  isCreatingPool ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Zap className="h-3.5 w-3.5" />
+                  )
+                }
+                disabled={isCreatingPool || !isConnected}
+                onClick={async () => {
+                  if (!isConnected) return openConnect();
+                  const hash = await createPool(ticker);
+                  if (hash) setTimeout(() => pool.refetch(), 1500);
+                }}
+              >
+                {isCreatingPool ? "Opening curve…" : `Open curve for $${ticker}`}
+              </Button>
+            ) : (
+              <Button variant="neutral" disabled>
+                Only the launcher can open this curve
+              </Button>
+            )}
           </div>
         </Card>
       )}

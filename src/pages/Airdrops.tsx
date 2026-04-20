@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Flame, Gift, Loader2 } from "lucide-react";
+import { Gift, Loader2, Rocket } from "lucide-react";
 import { useInterwovenKit } from "@initia/interwovenkit-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -21,7 +21,6 @@ function matchesHex(creatorHex: string, userHex: string | undefined): boolean {
   if (!userHex) return false;
   const a = creatorHex.toLowerCase().replace(/^0x/, "");
   const b = userHex.toLowerCase().replace(/^0x/, "");
-  // pad to 40 chars (20-byte eth-style address) to match formatting differences
   return a.padStart(40, "0") === b.padStart(40, "0");
 }
 
@@ -41,169 +40,113 @@ export default function Airdrops() {
   const connected = Boolean(kit.isConnected && kit.hexAddress);
 
   return (
-    <div className="page-shell">
-      <section className="page-hero px-6 py-8 md:px-8 md:py-9">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
-          <div className="max-w-3xl">
-            <div className="flex items-center gap-3 font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-              <span>§ creator rewards</span>
-              <span className="h-px flex-1 hairline" />
-            </div>
-            <h1 className="mt-3 text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.98] text-editorial-ink">
-              <span className="font-editorial italic text-editorial">claim</span>{" "}
-              <span className="font-display font-medium tracking-tight">your fees</span>
-              <span className="text-secondary">.</span>
-            </h1>
-            <p className="mt-4 text-body-lg leading-[1.6] text-on-surface-variant">
-              Every trade on your pool pays a 0.5% fee into <code className="font-mono text-editorial-ink">fee_accumulated</code>.
-              This page keeps creator income, claimable pools, and claim actions in one cleaner surface.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <div className="metric-card px-5 py-5">
-              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
-                unclaimed
-              </span>
-              <div className="mt-2 font-editorial italic text-[2.4rem] leading-none text-editorial-ink">
-                {formatInit(totalUnclaimed, 2)}
-              </div>
-              <div className="mt-1 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-secondary">
-                MIN
-              </div>
-            </div>
-
-            <div className="metric-card px-5 py-5">
-              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
-                claimable pools
-              </span>
-              <div className="mt-2 text-title-lg text-on-surface">
-                {claimableCount} of {myPools.length}
-              </div>
-              <div className="mt-1 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                creator wallets only
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <Card tier="base" padded="lg" className="flex flex-wrap items-center justify-between gap-6">
-        <div className="flex flex-col gap-1">
-          <span className="font-mono text-[0.62rem] uppercase tracking-[0.28em] text-on-surface-muted">
-            Unclaimed · {claimableCount} of {myPools.length} pools
+    <div className="flex flex-col gap-5 pb-8">
+      <Card padded="lg" className="flex flex-wrap items-center justify-between gap-6">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-medium text-on-surface-variant">
+            Total claimable · {claimableCount} of {myPools.length} pools
           </span>
-          <span className="flex items-baseline gap-3">
-            <span className="font-editorial italic text-[3.5rem] leading-none text-editorial">
+          <div className="flex items-baseline gap-2">
+            <span className="font-mono text-[36px] font-medium tabular-nums tracking-tight text-on-surface">
               {formatInit(totalUnclaimed, 4)}
             </span>
-            <span className="font-mono text-body-sm uppercase tracking-[0.2em] text-on-surface-muted">
-              MIN
-            </span>
+            <span className="font-mono text-[12px] text-on-surface-muted">MIN</span>
+          </div>
+          <span className="text-[12px] text-[#52525B]">
+            Every trade on your pool pays a 0.5% creator fee.
           </span>
         </div>
-        {!connected ? (
-          <Button variant="primary" size="lg" onClick={() => kit.openConnect()}>
+        {!connected && (
+          <Button
+            variant="primary"
+            size="lg"
+            leading={<Gift className="h-3.5 w-3.5" />}
+            onClick={() => kit.openConnect()}
+          >
             Connect wallet
           </Button>
-        ) : null}
+        )}
       </Card>
 
       {!connected ? (
-        <Card tier="base" padded="lg" className="text-center text-on-surface-variant">
-          <span className="font-mono text-label-sm uppercase tracking-[0.2em]">
+        <Card padded="lg" className="text-center">
+          <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-on-surface-variant">
             Connect a wallet to see your pools
           </span>
         </Card>
       ) : tokens.isLoading ? (
-        <Card tier="base" padded="lg" className="text-center text-on-surface-variant">
-          <span className="font-mono text-label-sm uppercase tracking-[0.2em]">
+        <Card padded="lg" className="text-center">
+          <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-on-surface-variant">
             Scanning your launches…
           </span>
         </Card>
       ) : myPools.length === 0 ? (
-        <Card tier="base" padded="lg" className="flex flex-col items-center gap-3 text-center">
-          <span className="font-editorial italic text-title-md text-editorial-ink">
+        <Card padded="lg" className="flex flex-col items-center gap-3 text-center">
+          <span className="text-[15px] font-semibold text-on-surface">
             You haven't launched any pools yet
           </span>
-          <span className="text-body-sm text-on-surface-variant">
+          <span className="text-[12.5px] text-on-surface-variant">
             Creator rewards accrue to the signer who called{" "}
-            <code className="font-mono text-editorial-ink">create_pool</code>.
+            <code className="font-mono">create_pool</code>.
           </span>
-          <Button asChild variant="hyperglow" size="sm" leading={<Flame className="h-4 w-4" />}>
+          <Button asChild variant="primary" size="sm" leading={<Rocket className="h-3.5 w-3.5" />}>
             <Link to="/launchpad">Launch a token</Link>
           </Button>
         </Card>
       ) : (
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <Card padded="none" className="overflow-hidden">
+          <div className="grid grid-cols-[minmax(180px,1.5fr)_1fr_1fr_1fr_auto] gap-4 border-b border-white/[0.06] px-4 py-2.5 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#52525B]">
+            <span>Token</span>
+            <span>Trades</span>
+            <span className="text-right">Reserve (MIN)</span>
+            <span className="text-right">Unclaimed (MIN)</span>
+            <span className="w-[120px]" />
+          </div>
           {myPools.map((t) => {
             const hasFees = t.feeAccumulated > 0n;
             return (
-              <Card
+              <div
                 key={t.ticker}
-                tier="base"
-                padded="md"
-                className="flex h-full flex-col gap-5"
+                className="grid grid-cols-[minmax(180px,1.5fr)_1fr_1fr_1fr_auto] items-center gap-4 border-b border-white/[0.04] px-4 py-3 last:border-b-0 hover:bg-white/[0.02]"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Avatar symbol={t.ticker} size="md" />
-                    <div className="min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <span className="truncate font-editorial italic text-[1.4rem] leading-none text-editorial-ink">
-                          {t.ticker.toLowerCase()}
-                        </span>
-                        <span className="font-mono text-label-sm uppercase tracking-widest text-on-surface-muted">
-                          ${t.ticker}
-                        </span>
-                      </div>
-                      <div className="mt-1 font-mono text-body-sm text-on-surface-variant">
-                        {t.tradeCount} trade{t.tradeCount === 1 ? "" : "s"} · #{t.launchHeight}
-                      </div>
+                <div className="flex items-center gap-3">
+                  <Avatar symbol={t.ticker} size="sm" />
+                  <div>
+                    <div className="text-[13px] font-medium text-on-surface">${t.ticker}</div>
+                    <div className="font-mono text-[11px] text-on-surface-muted">
+                      {t.ticker.toLowerCase()}.fun.init
                     </div>
                   </div>
-                  <Chip tone={hasFees ? "success" : "neutral"} dense>
-                    {hasFees ? "ready" : "idle"}
+                </div>
+                <span className="text-[12.5px] text-on-surface-variant">
+                  {t.tradeCount} trade{t.tradeCount === 1 ? "" : "s"}
+                </span>
+                <span className="text-right font-mono text-[13px] tabular-nums text-on-surface-variant">
+                  {formatInit(t.initReserve, 2)}
+                </span>
+                <span className="text-right font-mono text-[13px] tabular-nums text-on-surface">
+                  {formatInit(t.feeAccumulated, 4)}
+                </span>
+                <div className="flex items-center justify-end gap-2">
+                  <Chip tone={hasFees ? "success" : "muted"} dot>
+                    {hasFees ? "Ready" : "Idle"}
                   </Chip>
+                  <Button
+                    variant={hasFees ? "primary" : "neutral"}
+                    size="sm"
+                    disabled={!hasFees || isPending}
+                    onClick={() => hasFees && claim(t.ticker)}
+                    leading={
+                      isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : undefined
+                    }
+                  >
+                    {hasFees ? "Claim" : "Settled"}
+                  </Button>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3 border-y border-editorial/15 py-3">
-                  <div className="flex flex-col gap-0.5 pl-0">
-                    <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                      unclaimed
-                    </span>
-                    <span className="font-editorial italic text-headline-sm leading-none text-editorial-ink">
-                      {formatInit(t.feeAccumulated, 4)}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-0.5 border-l border-editorial/20 pl-3">
-                    <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                      pool reserve
-                    </span>
-                    <span className="font-mono text-body-sm text-on-surface">
-                      {formatInit(t.initReserve, 2)}{" "}
-                      <span className="text-on-surface-muted">MIN</span>
-                    </span>
-                  </div>
-                </div>
-
-                <Button
-                  variant={hasFees ? "primary" : "glass"}
-                  size="md"
-                  fullWidth
-                  disabled={!hasFees || isPending}
-                  onClick={() => hasFees && claim(t.ticker)}
-                  className="mt-auto"
-                  leading={
-                    isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />
-                  }
-                >
-                  {hasFees ? `Claim ${formatInit(t.feeAccumulated, 2)} MIN` : "Nothing to claim"}
-                </Button>
-              </Card>
+              </div>
             );
           })}
-        </section>
+        </Card>
       )}
     </div>
   );

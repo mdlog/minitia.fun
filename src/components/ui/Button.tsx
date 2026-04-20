@@ -8,8 +8,18 @@ import {
 } from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "primary" | "secondary" | "glass" | "tertiary" | "hyperglow" | "danger";
-type Size = "sm" | "md" | "lg";
+type Variant =
+  | "primary"
+  | "secondary"
+  | "neutral"
+  | "ghost"
+  | "outline"
+  | "danger"
+  | "glass"
+  | "tertiary"
+  | "hyperglow";
+
+type Size = "xs" | "sm" | "md" | "lg";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -21,24 +31,23 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<Variant, string> = {
-  primary:
-    "bg-gradient-primary text-primary-on shadow-glow-primary hover:-translate-y-0.5 hover:brightness-[1.04]",
-  secondary:
-    "bg-secondary text-secondary-on shadow-glow-secondary hover:-translate-y-0.5 hover:bg-secondary-dim",
-  glass:
-    "glass-low text-on-surface ghost-border hover:-translate-y-0.5 hover:bg-white/[0.1] hover:text-on-surface",
-  tertiary:
-    "bg-transparent text-on-surface-variant hover:bg-white/[0.05] hover:text-on-surface",
-  hyperglow:
-    "bg-gradient-hyperglow text-on-primary shadow-[0_16px_40px_rgba(47,197,164,0.24)] hover:-translate-y-0.5 hover:brightness-[1.03]",
-  danger:
-    "bg-error text-error-on shadow-[0_14px_34px_rgba(255,107,122,0.2)] hover:-translate-y-0.5 hover:brightness-105",
+  primary: "bg-primary text-white hover:bg-primary-dim active:bg-[#1E40AF]",
+  secondary: "bg-secondary text-white hover:bg-secondary-dim",
+  neutral: "bg-white/[0.06] text-on-surface hover:bg-white/[0.10] ghost-border",
+  ghost: "bg-transparent text-on-surface-variant hover:bg-white/[0.04] hover:text-on-surface",
+  outline: "bg-transparent text-on-surface ghost-border hover:bg-white/[0.04]",
+  danger: "bg-error text-white hover:brightness-110",
+  // Aliases for backwards compatibility
+  glass: "bg-white/[0.06] text-on-surface hover:bg-white/[0.10] ghost-border",
+  tertiary: "bg-transparent text-on-surface-variant hover:bg-white/[0.04] hover:text-on-surface",
+  hyperglow: "bg-primary text-white hover:bg-primary-dim",
 };
 
 const sizeStyles: Record<Size, string> = {
-  sm: "h-9 rounded-xl px-3.5 text-body-sm",
-  md: "h-11 rounded-xl px-4.5 text-body-md",
-  lg: "h-12 rounded-xl px-6 text-body-md",
+  xs: "h-7 px-2.5 text-[12px] rounded-md",
+  sm: "h-8 px-3 text-[12.5px] rounded-md",
+  md: "h-9 px-3.5 text-[13px] rounded-lg",
+  lg: "h-10 px-4 text-[13.5px] rounded-lg",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -56,10 +65,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   ref,
 ) {
   const buttonClassName = cn(
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium snappy transition-all duration-200",
-    "disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none",
-    "active:scale-[0.985]",
-    "focus-ring",
+    "inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-medium snappy transition-colors duration-150",
+    "disabled:cursor-not-allowed disabled:opacity-40",
+    "active:scale-[0.99] focus-ring",
     variantStyles[variant],
     sizeStyles[size],
     fullWidth && "w-full",
@@ -77,10 +85,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   );
 
   if (asChild) {
-    if (!isValidElement(children)) {
-      return null;
-    }
-
+    if (!isValidElement(children)) return null;
     const child = children as ReactElement<{ className?: string; children?: ReactNode }>;
     return cloneElement(child, {
       className: cn(buttonClassName, child.props.className),
@@ -89,12 +94,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   }
 
   return (
-    <button
-      ref={ref}
-      type={rest.type ?? "button"}
-      className={buttonClassName}
-      {...rest}
-    >
+    <button ref={ref} type={rest.type ?? "button"} className={buttonClassName} {...rest}>
       {content}
     </button>
   );

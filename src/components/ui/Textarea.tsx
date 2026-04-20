@@ -14,36 +14,26 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   const inputId = id ?? rest.name;
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-1.5">
       {label && (
-        <label
-          htmlFor={inputId}
-          className="text-[0.68rem] font-mono uppercase tracking-[0.22em] text-on-surface-variant"
-        >
+        <label htmlFor={inputId} className="text-[11px] font-medium text-on-surface-variant">
           {label}
         </label>
       )}
-      <div
+      <textarea
+        ref={ref}
+        id={inputId}
         className={cn(
-          "relative rounded-2xl surface-nested ghost-border transition-all duration-200",
-          "focus-within:-translate-y-0.5 focus-within:shadow-[0_0_0_1px_rgba(91,140,255,0.28),0_0_0_6px_rgba(91,140,255,0.1)]",
-          error && "shadow-[0_0_0_1px_rgba(255,84,112,0.35),0_0_0_6px_rgba(255,84,112,0.08)]",
+          "min-h-[96px] w-full resize-none rounded-lg bg-[#0F0F11] ghost-border px-3 py-2.5 text-[13.5px] text-on-surface outline-none placeholder:text-[#52525B] focus:ring-1 focus:ring-primary/50",
+          error && "ring-1 ring-error/50",
+          className,
         )}
-      >
-        <textarea
-          ref={ref}
-          id={inputId}
-          className={cn(
-            "min-h-[132px] w-full resize-none bg-transparent px-4 py-3 text-body-md text-on-surface outline-none placeholder:text-on-surface-muted",
-            className,
-          )}
-          {...rest}
-        />
-      </div>
+        {...rest}
+      />
       {(hint || error) && (
-        <p className={cn("text-body-sm", error ? "text-error" : "text-on-surface-muted")}>
+        <span className={cn("text-[11px]", error ? "text-[#FB7185]" : "text-[#52525B]")}>
           {error ?? hint}
-        </p>
+        </span>
       )}
     </div>
   );

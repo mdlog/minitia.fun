@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, ExternalLink, Flame } from "lucide-react";
+import { Activity, ArrowUpRight, ExternalLink, Rocket, Trophy } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
-import { GhostNumeral } from "@/components/ui/GhostNumeral";
+import { Delta } from "@/components/ui/Delta";
 import { ProgressBar } from "@/components/ui/ProgressBar";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { Segmented } from "@/components/ui/Segmented";
+import { Stat } from "@/components/ui/Stat";
 import { useAppchainStats } from "@/hooks/useAppchainStats";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import {
@@ -15,22 +18,16 @@ import {
   type LaunchedToken,
 } from "@/hooks/useAllLaunchedTokens";
 import { APPCHAIN } from "@/lib/initia";
-import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/format";
 
-type FilterKey = "all" | "active" | "graduated" | "no_pool";
+type FilterKey = "All" | "Trading" | "Graduated" | "No pool";
 
-const FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Trading" },
-  { key: "graduated", label: "Graduated" },
-  { key: "no_pool", label: "No pool" },
+const FILTERS: Array<{ value: FilterKey; label: string }> = [
+  { value: "All", label: "All" },
+  { value: "Trading", label: "Trading" },
+  { value: "Graduated", label: "Graduated" },
+  { value: "No pool", label: "No pool" },
 ];
-
-function shortAddr(addr: string, chars = 4): string {
-  if (!addr) return "—";
-  return addr.length <= chars * 2 + 2 ? addr : `${addr.slice(0, chars + 2)}…${addr.slice(-chars)}`;
-}
 
 function formatInitFromUmin(umin: bigint, digits = 2): string {
   if (umin === 0n) return "0";
@@ -40,440 +37,268 @@ function formatInitFromUmin(umin: bigint, digits = 2): string {
   return `${whole.toLocaleString("en-US")}${digits > 0 ? "." + fracStr : ""}`;
 }
 
-function tokenStatus(t: LaunchedToken): { tone: "success" | "glow" | "info" | "warning"; label: string } {
-  if (!t.poolExists) return { tone: "warning", label: "no pool" };
-  if (t.graduated) return { tone: "success", label: "graduated" };
-  const pct = graduationProgress(t.initReserve);
-  if (pct >= 50) return { tone: "glow", label: "hot" };
-  return { tone: "info", label: "trading" };
+function tokenStatusChip(t: LaunchedToken) {
+  if (!t.poolExists) return <Chip tone="warning" dot>No pool</Chip>;
+  if (t.graduated) return <Chip tone="success" dot>Graduated</Chip>;
+  return <Chip tone="neutral" dot>Active</Chip>;
 }
 
 export default function Discovery() {
   const network = useNetworkStatus();
   const stats = useAppchainStats();
   const tokens = useAllLaunchedTokens(50);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilter] = useState<FilterKey>("All");
 
   const liveOnRollup = network.data?.source === "appchain" && network.data?.healthy;
 
   const filtered = useMemo(() => {
     const list = tokens.data ?? [];
-    if (filter === "all") return list;
-    if (filter === "graduated") return list.filter((t) => t.graduated);
-    if (filter === "no_pool") return list.filter((t) => !t.poolExists);
+    if (filter === "All") return list;
+    if (filter === "Graduated") return list.filter((t) => t.graduated);
+    if (filter === "No pool") return list.filter((t) => !t.poolExists);
     return list.filter((t) => t.poolExists && !t.graduated);
   }, [tokens.data, filter]);
 
   return (
-    <div className="page-shell">
-      <section className="page-hero grain dotgrid px-6 py-10 md:px-10 md:py-12">
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
-          <div className="reveal text-on-surface" style={{ ["--d" as string]: "80ms" }}>
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <Chip tone="info" dense>
-                Live token discovery
-              </Chip>
-              <Chip tone={liveOnRollup ? "success" : "neutral"} dense>
-                {liveOnRollup ? "Appchain healthy" : "Syncing status"}
-              </Chip>
-            </div>
-
-            <h1>
-              <span className="block text-[clamp(3rem,9vw,7rem)] font-editorial italic leading-[0.95] text-editorial-ink">
-                Launch
-              </span>
-              <span className="block text-[clamp(2.25rem,6.5vw,5.25rem)] font-display font-medium leading-[0.98] tracking-tight">
-                anything. <span className="text-on-surface-variant">Graduate</span>
-              </span>
-              <span className="block text-[clamp(2.25rem,6.5vw,5.25rem)] font-display font-medium leading-[0.98] tracking-tight">
-                <span className="font-editorial italic font-normal text-editorial">fast</span>
-                <span className="text-secondary">.</span>
-              </span>
+    <div className="flex flex-col gap-6 pb-8">
+      {/* Hero + metrics */}
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <Card padded="lg" className="flex flex-col justify-between gap-6 overflow-hidden">
+          <div className="flex max-w-xl flex-col gap-3">
+            <Chip tone={liveOnRollup ? "success" : "info"} dot>
+              {liveOnRollup ? "Appchain healthy" : "Protocol stable"}
+            </Chip>
+            <h1 className="text-[30px] font-semibold leading-[1.1] tracking-tight text-on-surface">
+              Launch anything. <span className="text-on-surface-muted">Graduate fast.</span>
             </h1>
-
-            <p className="mt-5 max-w-3xl text-body-lg leading-[1.6] text-on-surface-variant">
-              A more polished control surface for the Initia launch flow: deploy a token, monitor
-              live on-curve activity, then graduate demand into its own appchain without leaving the product.
+            <p className="text-[13.5px] leading-[1.55] text-on-surface-variant">
+              A sovereign launchpad on Initia. Deploy a token, trade on-curve, then promote to its
+              own appchain — in a single cockpit.
             </p>
-
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button asChild variant="hyperglow" size="md" leading={<Flame className="h-4 w-4" />}>
-                <Link to="/launchpad">Launch token</Link>
-              </Button>
-              <Button asChild variant="glass" size="md" trailing={<ArrowUpRight className="h-4 w-4" />}>
-                <Link to="/trade/MOVE">Open market</Link>
-              </Button>
-            </div>
           </div>
-
-          <div
-            className="reveal grid gap-3 sm:grid-cols-2 xl:grid-cols-1"
-            style={{ ["--d" as string]: "240ms" }}
-          >
-            <div className="metric-card px-5 py-5">
-              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
-                tokens indexed
-              </span>
-              <div className="mt-2 flex items-end justify-between gap-3">
-                <span className="font-editorial italic text-[2.5rem] leading-none text-editorial-ink">
-                  {tokens.data?.length ?? 0}
-                </span>
-                <span className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-secondary">
-                  live
-                </span>
-              </div>
-            </div>
-
-            <div className="metric-card px-5 py-5">
-              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
-                network pulse
-              </span>
-              <div className="mt-2 flex items-end justify-between gap-3">
-                <span className="font-display text-title-lg text-on-surface">
-                  {network.isLoading ? "Checking" : liveOnRollup ? "Healthy" : network.data?.source ?? "Offline"}
-                </span>
-                <span className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                  #{network.data?.blockHeight ? formatNumber(network.data.blockHeight) : "—"}
-                </span>
-              </div>
-            </div>
-
-            <div className="metric-card px-5 py-5 sm:col-span-2 xl:col-span-1">
-              <span className="text-[0.62rem] font-mono uppercase tracking-[0.24em] text-on-surface-muted">
-                launch objective
-              </span>
-              <p className="mt-2 text-body-sm leading-relaxed text-on-surface-variant">
-                Keep the front page focused on signal: active tickers, graduation progress, and chain readiness.
-              </p>
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="primary" leading={<Rocket className="h-3.5 w-3.5" />}>
+              <Link to="/launchpad">Launch token</Link>
+            </Button>
+            <Button asChild variant="outline" trailing={<ArrowUpRight className="h-3.5 w-3.5" />}>
+              <Link to="/trade/MOVE">Open market</Link>
+            </Button>
           </div>
-        </div>
+        </Card>
+
+        <Card padded="md" className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium text-on-surface-variant">Protocol metrics</span>
+            <Chip tone="muted">Live</Chip>
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+            <Stat
+              label="Chain"
+              value={network.data?.chainId ?? "—"}
+              tone="info"
+            />
+            <Stat
+              label="Block"
+              value={network.data?.blockHeight ? `#${formatNumber(network.data.blockHeight)}` : "—"}
+            />
+            <Stat
+              label="Launched"
+              value={stats.data?.enabled ? formatNumber(stats.data.launchesOnChain) : "—"}
+              unit="total"
+              tone="success"
+            />
+            <Stat
+              label="Move txs"
+              value={stats.data?.enabled ? formatNumber(stats.data.msgExecuteCount) : "—"}
+            />
+          </div>
+        </Card>
       </section>
 
-      <section className="relative flex flex-col gap-8">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="flex items-end gap-4">
-            <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-              § 01
-            </span>
-            <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-editorial italic leading-[1] text-editorial-ink">
-              Launched on Minitia.fun
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-[0.2em] ${
-                tokens.isFetching
-                  ? "bg-secondary-container/70 text-secondary"
-                  : "bg-white/[0.04] text-on-surface-variant"
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  tokens.isFetching ? "bg-secondary animate-pulse" : "bg-on-surface-muted"
-                }`}
-              />
-              {tokens.isFetching ? "syncing" : "live"}
-            </span>
-            <span className="font-mono text-[0.68rem] uppercase tracking-[0.22em] text-on-surface-muted">
-              {tokens.data?.length ?? 0} tokens
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {FILTERS.map((f) => {
-            const active = filter === f.key;
-            const count =
-              f.key === "all"
-                ? tokens.data?.length ?? 0
-                : f.key === "graduated"
-                  ? tokens.data?.filter((t) => t.graduated).length ?? 0
-                  : f.key === "no_pool"
-                    ? tokens.data?.filter((t) => !t.poolExists).length ?? 0
-                    : tokens.data?.filter((t) => t.poolExists && !t.graduated).length ?? 0;
-            return (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`rounded-full px-3 py-1.5 font-mono text-[0.68rem] uppercase tracking-[0.2em] snappy ${
-                  active
-                    ? "bg-editorial-ink text-surface"
-                    : "bg-white/[0.04] text-on-surface-variant hover:bg-white/[0.08]"
-                }`}
-              >
-                {f.label}
-                <span className="ml-1.5 text-on-surface-muted">{count}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="h-px hairline" />
+      {/* Trending table */}
+      <section className="flex flex-col gap-3">
+        <SectionHeader
+          title="Launched on Minitia.fun"
+          description="Tokens ranked by recent on-curve activity."
+          action={
+            <div className="flex items-center gap-2">
+              <Segmented value={filter} onChange={setFilter} options={FILTERS} />
+              <span className="font-mono text-[11px] text-on-surface-muted">
+                {tokens.data?.length ?? 0} tokens
+              </span>
+            </div>
+          }
+        />
 
         {tokens.isLoading ? (
-          <Card tier="base" padded="lg" className="text-center text-on-surface-variant">
-            <span className="font-mono text-label-sm uppercase tracking-[0.2em]">
+          <Card padded="lg" className="text-center">
+            <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-on-surface-variant">
               Scanning rollup for launches…
             </span>
           </Card>
         ) : filtered.length === 0 ? (
-          <Card tier="base" padded="lg" className="flex flex-col items-center gap-3 text-center">
-            <span className="font-editorial italic text-title-md text-editorial-ink">
+          <Card padded="lg" className="flex flex-col items-center gap-3 text-center">
+            <span className="text-[15px] font-semibold text-on-surface">
               {tokens.data?.length === 0 ? "No tokens launched yet" : "Nothing matches this filter"}
             </span>
-            <span className="text-body-sm text-on-surface-variant">
+            <span className="text-[12.5px] text-on-surface-variant">
               {tokens.data?.length === 0
                 ? "Be the first to seed a ticker on the curve."
                 : "Try another filter, or launch something new."}
             </span>
-            <Button asChild variant="hyperglow" size="sm" leading={<Flame className="h-4 w-4" />}>
+            <Button asChild variant="primary" size="sm" leading={<Rocket className="h-3.5 w-3.5" />}>
               <Link to="/launchpad">Launch a token</Link>
             </Button>
           </Card>
         ) : (
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <Card padded="none" className="overflow-hidden">
+            <div className="grid grid-cols-[minmax(180px,1.5fr)_1fr_1fr_1fr_1.2fr_0.8fr_auto] gap-4 border-b border-white/[0.06] px-4 py-2.5 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#52525B]">
+              <span>Token</span>
+              <span className="text-right">Liq (INIT)</span>
+              <span className="text-right">Trades</span>
+              <span className="text-right">Volume</span>
+              <span>Graduation</span>
+              <span>Status</span>
+              <span className="w-[60px]" />
+            </div>
             {filtered.map((t, i) => {
-              const status = tokenStatus(t);
               const gradPct = graduationProgress(t.initReserve);
-              const ctaHref = t.graduated ? `/graduation/${t.ticker}` : `/trade/${t.ticker}`;
-              const ctaLabel = !t.poolExists
-                ? "View token"
-                : t.graduated
-                  ? "Claim"
-                  : `Trade $${t.ticker}`;
-              const ctaTone: "primary" | "hyperglow" | "secondary" = t.graduated
-                ? "hyperglow"
-                : "primary";
-              const heat = gradPct >= 50 || t.tradeCount >= 3;
+              const href = t.graduated ? `/graduation/${t.ticker}` : `/trade/${t.ticker}`;
               return (
-                <Card
+                <Link
                   key={t.ticker}
-                  tier="base"
-                  interactive
-                  padded={false}
-                  className="reveal group relative flex h-full flex-col overflow-hidden"
-                  style={{ ["--d" as string]: `${Math.min(i * 80, 480)}ms` }}
+                  to={href}
+                  className="grid grid-cols-[minmax(180px,1.5fr)_1fr_1fr_1fr_1.2fr_0.8fr_auto] items-center gap-4 border-b border-white/[0.04] px-4 py-3 transition-colors last:border-b-0 hover:bg-white/[0.02]"
                 >
-                  {/* Hero art — giant ticker letter as decorative cover */}
-                  <div className="relative h-32 overflow-hidden bg-gradient-to-br from-editorial/25 via-primary-container/30 to-tertiary-container/30">
-                    <div className="grain absolute inset-0 opacity-40" />
-                    <div className="dotgrid absolute inset-0 opacity-50" />
-                    <span
-                      className="absolute inset-0 flex items-center justify-center font-editorial italic leading-none text-editorial-ink/85 mix-blend-overlay select-none"
-                      style={{ fontSize: "9.5rem" }}
-                    >
-                      {t.ticker.charAt(0).toLowerCase()}
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="w-5 font-mono text-[11px] tabular-nums text-[#52525B]">
+                      {String(t.launchIndex || i + 1).padStart(2, "0")}
                     </span>
-                    <div className="absolute left-4 top-4 flex items-center gap-1.5">
-                      <span className="rounded-full bg-surface/80 px-2 py-0.5 font-mono text-[0.58rem] uppercase tracking-[0.24em] text-on-surface backdrop-blur-glass">
-                        #{t.launchIndex || i + 1}
+                    <Avatar symbol={t.ticker} size="sm" />
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate text-[13px] font-medium text-on-surface">
+                        {t.name}
                       </span>
-                      {heat && !t.graduated && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 font-mono text-[0.58rem] uppercase tracking-[0.22em] text-amber-300 backdrop-blur-glass">
-                          <Flame className="h-3 w-3" /> hot
-                        </span>
-                      )}
+                      <span className="font-mono text-[11px] text-on-surface-muted">
+                        ${t.ticker}
+                      </span>
                     </div>
-                    <GhostNumeral
-                      index={t.launchIndex || i + 1}
-                      className="absolute right-3 bottom-1 text-[4.5rem] opacity-50"
+                  </div>
+                  <span className="text-right font-mono text-[13px] tabular-nums text-on-surface">
+                    {formatInitFromUmin(t.initReserve, 2)}
+                  </span>
+                  <span className="text-right font-mono text-[13px] tabular-nums text-on-surface-variant">
+                    {formatNumber(t.tradeCount)}
+                  </span>
+                  <span className="text-right font-mono text-[13px] tabular-nums text-on-surface-variant">
+                    {t.tradeCount > 0 ? <Delta value={0} /> : "—"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <ProgressBar
+                      value={gradPct}
+                      tone={t.graduated ? "secondary" : "primary"}
+                      size="sm"
+                      className="max-w-[120px] flex-1"
                     />
+                    <span className="w-10 text-right font-mono text-[11px] tabular-nums text-on-surface-muted">
+                      {gradPct.toFixed(0)}%
+                    </span>
                   </div>
-
-                  <div className="flex flex-1 flex-col gap-4 px-5 pb-5 pt-4">
-                    {/* Identity */}
-                    <div className="flex items-start gap-3">
-                      <Avatar symbol={t.ticker} size="md" className="-mt-8 ring-4 ring-surface" />
-                      <div className="min-w-0 flex-1 pt-1">
-                        <div className="flex items-baseline gap-2">
-                          <span className="truncate font-editorial italic text-[1.6rem] leading-none text-editorial-ink">
-                            {t.ticker.toLowerCase()}
-                          </span>
-                          <span className="font-mono text-label-sm uppercase tracking-widest text-on-surface-muted">
-                            ${t.ticker}
-                          </span>
-                        </div>
-                        <p className="mt-1 truncate text-body-sm text-on-surface-variant">
-                          {t.name}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Stats row */}
-                    <div className="grid grid-cols-3 gap-2 text-body-sm">
-                      <div className="flex flex-col gap-0.5 border-l border-editorial/25 pl-2.5">
-                        <span className="font-mono text-[0.56rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                          liq
-                        </span>
-                        <span className="font-mono tabular-nums text-on-surface">
-                          {formatInitFromUmin(t.initReserve, 2)}
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-0.5 border-l border-editorial/25 pl-2.5">
-                        <span className="font-mono text-[0.56rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                          trades
-                        </span>
-                        <span className="font-mono tabular-nums text-on-surface">
-                          {formatNumber(t.tradeCount)}
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-0.5 border-l border-editorial/25 pl-2.5">
-                        <span className="font-mono text-[0.56rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                          grad
-                        </span>
-                        <span className="font-mono tabular-nums text-on-surface">
-                          {gradPct.toFixed(0)}%
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Flame gauge — progress bar with burn tone */}
-                    <div className="flex flex-col gap-1">
-                      <div
-                        className="relative h-1.5 overflow-hidden rounded-full bg-white/[0.06]"
-                        aria-label={`Graduation ${gradPct.toFixed(1)}%`}
-                      >
-                        <div
-                          className={cn(
-                            "absolute inset-y-0 left-0 rounded-full transition-all duration-500",
-                            t.graduated
-                              ? "bg-gradient-to-r from-amber-400 via-amber-300 to-amber-200"
-                              : gradPct >= 75
-                                ? "bg-gradient-to-r from-red-400 via-amber-400 to-amber-300"
-                                : gradPct >= 50
-                                  ? "bg-gradient-to-r from-orange-500 to-amber-400"
-                                  : gradPct >= 25
-                                    ? "bg-gradient-to-r from-primary to-tertiary"
-                                    : "bg-gradient-to-r from-editorial to-primary",
-                          )}
-                          style={{ width: `${Math.max(2, gradPct)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="mt-auto flex items-center justify-between pt-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Chip tone={status.tone} dense>
-                          {status.label}
-                        </Chip>
-                        <Link
-                          to={`/u/${t.creator}`}
-                          className="truncate font-mono text-[0.6rem] uppercase tracking-[0.2em] text-on-surface-muted hover:text-editorial-ink snappy"
-                          title={t.creator}
-                        >
-                          by {shortAddr(t.creator)}
-                        </Link>
-                      </div>
-                      <Button
-                        asChild
-                        variant={ctaTone}
-                        size="sm"
-                        trailing={<ArrowUpRight className="h-3.5 w-3.5" />}
-                      >
-                        <Link to={ctaHref}>{ctaLabel}</Link>
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
+                  <div>{tokenStatusChip(t)}</div>
+                  <Button
+                    variant="neutral"
+                    size="xs"
+                    trailing={<ArrowUpRight className="h-3 w-3" />}
+                  >
+                    {t.graduated ? "View" : "Trade"}
+                  </Button>
+                </Link>
               );
             })}
-          </div>
+          </Card>
         )}
       </section>
 
+      {/* Protocol architecture */}
+      <section className="grid gap-4 md:grid-cols-3">
+        {[
+          {
+            icon: Rocket,
+            title: "Launch",
+            desc: "Mint a token in seconds. Metadata, ticker, curve — ready to trade.",
+          },
+          {
+            icon: Activity,
+            title: "Trade",
+            desc: "100ms blocks, auto-signed. Bonding curve to 5k INIT milestone.",
+          },
+          {
+            icon: Trophy,
+            title: "Graduate",
+            desc: "Migrate liquidity to InitiaDEX. Promote to a sovereign L2.",
+          },
+        ].map((step) => {
+          const Icon = step.icon;
+          return (
+            <Card key={step.title} padded="md" className="flex flex-col gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white/[0.04] text-[#60A5FA]">
+                <Icon className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[13.5px] font-semibold text-on-surface">{step.title}</span>
+                <p className="text-[12.5px] leading-[1.55] text-on-surface-variant">{step.desc}</p>
+              </div>
+            </Card>
+          );
+        })}
+      </section>
+
+      {/* Rollup live panel (kept, cleaner) */}
       {network.data && (
-        <section className="relative flex flex-col gap-8">
-          <div className="flex flex-wrap items-end justify-between gap-6">
-            <div className="flex items-end gap-4">
-              <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-                § live
-              </span>
-              <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-editorial italic leading-[1] text-editorial-ink">
-                Our rollup, live
-              </h2>
-            </div>
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[0.62rem] uppercase tracking-[0.2em] ${
-                liveOnRollup
-                  ? "bg-secondary-container/70 text-secondary"
-                  : "bg-white/[0.04] text-on-surface-variant"
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  liveOnRollup ? "bg-secondary animate-pulse" : "bg-on-surface-muted"
-                }`}
-              />
-              {network.isLoading ? "Syncing" : liveOnRollup ? "Live" : network.data.source}
-            </span>
+        <Card padded="lg" className="flex flex-col gap-5">
+          <SectionHeader
+            title="Our rollup, live"
+            description="Direct observability on the Minitia appchain."
+            action={
+              <Chip tone={liveOnRollup ? "success" : "neutral"} dot>
+                {liveOnRollup ? "Live" : network.data.source}
+              </Chip>
+            }
+          />
+          <div className="grid gap-6 md:grid-cols-4">
+            <Stat label="Chain" value={network.data.chainId} tone="info" />
+            <Stat label="Block height" value={`#${formatNumber(network.data.blockHeight)}`} />
+            <Stat
+              label="Tokens launched"
+              value={stats.data?.enabled ? formatNumber(stats.data.launchesOnChain) : "—"}
+              tone="success"
+            />
+            <Stat
+              label="Move txs"
+              value={stats.data?.enabled ? formatNumber(stats.data.msgExecuteCount) : "—"}
+            />
           </div>
-
-          <div className="h-px hairline" />
-
-          <Card tier="base" padded="lg" className="flex flex-col gap-6">
-            <div className="grid gap-6 md:grid-cols-4">
-              <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
-                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                  chain
-                </span>
-                <span className="font-editorial italic text-title-lg text-editorial">
-                  {network.data.chainId}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
-                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                  block height
-                </span>
-                <span className="font-editorial text-[2rem] leading-none text-editorial-ink">
-                  #{formatNumber(network.data.blockHeight)}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
-                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                  tokens launched
-                </span>
-                <span className="font-editorial text-[2rem] leading-none text-secondary">
-                  {stats.data?.enabled
-                    ? formatNumber(stats.data.launchesOnChain)
-                    : "—"}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
-                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                  move txs
-                </span>
-                <span className="font-editorial text-[2rem] leading-none text-tertiary">
-                  {stats.data?.enabled
-                    ? formatNumber(stats.data.msgExecuteCount)
-                    : "—"}
-                </span>
-              </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.05] pt-4">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-on-surface-muted">
+                token_factory module
+              </span>
+              <code className="truncate font-mono text-[12px] text-on-surface-variant">
+                {APPCHAIN.deployedAddress}
+              </code>
             </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-editorial/15 pt-5 text-body-sm text-on-surface-variant">
-              <div className="flex flex-col gap-0.5">
-                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                  token_factory module
-                </span>
-                <code className="font-mono text-body-sm text-editorial-ink break-all">
-                  {APPCHAIN.deployedAddress}
-                </code>
-              </div>
-              {APPCHAIN.rpc && (
-                <a
-                  href={`${APPCHAIN.rpc}/status`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-secondary hover:text-editorial-ink"
-                >
-                  Verify on RPC <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-            </div>
-          </Card>
-        </section>
+            {APPCHAIN.rpc && (
+              <a
+                href={`${APPCHAIN.rpc}/status`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-[11px] text-secondary hover:text-on-surface"
+              >
+                Verify on RPC <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+        </Card>
       )}
     </div>
   );

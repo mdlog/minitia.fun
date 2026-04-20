@@ -2,23 +2,27 @@ import { cn } from "@/lib/cn";
 
 export interface AvatarProps {
   symbol: string;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   variant?: "gradient-1" | "gradient-2" | "gradient-3" | "auto";
   className?: string;
 }
 
-const sizeMap = {
-  sm: "h-9 w-9 text-body-sm",
-  md: "h-11 w-11 text-body-md",
-  lg: "h-14 w-14 text-title-lg",
-  xl: "h-20 w-20 text-headline-sm",
+const sizeMap: Record<NonNullable<AvatarProps["size"]>, string> = {
+  xs: "h-6 w-6 text-[10px]",
+  sm: "h-8 w-8 text-[11px]",
+  md: "h-9 w-9 text-[12px]",
+  lg: "h-11 w-11 text-[13px]",
+  xl: "h-14 w-14 text-[16px]",
 };
 
-const gradientMap: Record<string, string> = {
-  "gradient-1": "bg-[conic-gradient(from_120deg,#A9BEFF,#4F82E8,#2FC5A4,#A9BEFF)]",
-  "gradient-2": "bg-[conic-gradient(from_0deg,#C9D5FF,#6C87BA,#143458,#C9D5FF)]",
-  "gradient-3": "bg-[conic-gradient(from_240deg,#2FC5A4,#89AFFF,#5A7DD8,#2FC5A4)]",
-};
+const SWATCHES = [
+  { bg: "#1E3A8A", fg: "#93C5FD" },
+  { bg: "#064E3B", fg: "#6EE7B7" },
+  { bg: "#1E293B", fg: "#CBD5E1" },
+  { bg: "#3F3F46", fg: "#E4E4E7" },
+  { bg: "#4C1D95", fg: "#C4B5FD" },
+  { bg: "#3F1D38", fg: "#F5D0FE" },
+];
 
 function hash(s: string): number {
   let h = 0;
@@ -26,20 +30,18 @@ function hash(s: string): number {
   return Math.abs(h);
 }
 
-export function Avatar({ symbol, size = "md", variant = "auto", className }: AvatarProps) {
-  const key = variant === "auto" ? `gradient-${(hash(symbol) % 3) + 1}` : variant;
-
+export function Avatar({ symbol, size = "md", className }: AvatarProps) {
+  const sw = SWATCHES[hash(symbol) % SWATCHES.length];
   return (
     <div
       className={cn(
-        "relative flex shrink-0 items-center justify-center rounded-full font-mono font-bold text-surface shadow-[0_18px_34px_rgba(3,8,18,0.28)] ring-1 ring-white/10",
-        "before:absolute before:inset-[1px] before:rounded-full before:bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.24),rgba(255,255,255,0)_45%)] before:content-['']",
+        "flex shrink-0 items-center justify-center rounded-md font-mono font-semibold ghost-border",
         sizeMap[size],
-        gradientMap[key],
         className,
       )}
+      style={{ background: sw.bg, color: sw.fg }}
     >
-      <span className="relative z-10 drop-shadow-sm">{symbol.slice(0, 1).toUpperCase()}</span>
+      {symbol.slice(0, 2).toUpperCase()}
     </div>
   );
 }

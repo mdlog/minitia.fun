@@ -4,38 +4,55 @@ import { cn } from "@/lib/cn";
 export interface StatProps {
   label: string;
   value: ReactNode;
+  unit?: ReactNode;
   sub?: ReactNode;
   trend?: "up" | "down" | "flat";
+  tone?: "default" | "success" | "danger" | "info";
   emphasis?: "display" | "headline" | "title";
   className?: string;
 }
 
-export function Stat({ label, value, sub, trend, emphasis = "headline", className }: StatProps) {
-  const trendColor =
-    trend === "up"
-      ? "text-secondary"
-      : trend === "down"
-        ? "text-error"
-        : "text-on-surface-variant";
+export function Stat({
+  label,
+  value,
+  unit,
+  sub,
+  trend,
+  tone,
+  className,
+}: StatProps) {
+  const trendTone =
+    trend === "up" ? "success" : trend === "down" ? "danger" : undefined;
+  const resolvedTone = tone ?? trendTone ?? "default";
 
-  const valueClass =
-    emphasis === "display"
-      ? "text-display-sm font-display tracking-tight"
-      : emphasis === "headline"
-        ? "text-headline-md font-display tracking-tight"
-        : "text-title-lg font-display tracking-tight";
+  const valueColor = {
+    default: "text-on-surface",
+    success: "text-[#34D399]",
+    danger: "text-[#FB7185]",
+    info: "text-[#60A5FA]",
+  }[resolvedTone];
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <span className="text-[0.68rem] font-mono uppercase tracking-[0.22em] text-on-surface-variant">
+    <div className={cn("flex flex-col gap-1", className)}>
+      <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-on-surface-muted">
         {label}
       </span>
-      <span className={cn(valueClass, "text-on-surface font-mono")}>{value}</span>
+      <span className="flex items-baseline gap-1.5">
+        <span
+          className={cn(
+            "font-mono text-[20px] font-medium tabular-nums tracking-tight",
+            valueColor,
+          )}
+        >
+          {value}
+        </span>
+        {unit && <span className="font-mono text-[11px] text-on-surface-muted">{unit}</span>}
+      </span>
       {sub && (
         <span
           className={cn(
-            "text-body-sm leading-relaxed",
-            trend ? trendColor : "text-on-surface-muted",
+            "text-[11.5px] leading-relaxed",
+            resolvedTone === "default" ? "text-on-surface-muted" : valueColor,
           )}
         >
           {sub}

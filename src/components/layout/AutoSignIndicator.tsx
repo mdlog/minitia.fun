@@ -80,10 +80,10 @@ export function AutoSignIndicator() {
       onClick={toggle}
       disabled={isLoading}
       className={cn(
-        "hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.58rem] font-mono uppercase tracking-[0.24em] snappy transition-colors lg:inline-flex",
+        "hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors lg:inline-flex",
         enabled
-          ? "bg-secondary-container/70 text-secondary hover:bg-secondary-container"
-          : "bg-white/[0.05] text-on-surface-variant hover:bg-white/[0.1] hover:text-on-surface",
+          ? "bg-[#10B981]/10 text-[#34D399] hover:bg-[#10B981]/15"
+          : "bg-[#0F0F11] ghost-border text-on-surface-variant hover:text-on-surface",
         isLoading && "cursor-wait opacity-60",
       )}
       title={

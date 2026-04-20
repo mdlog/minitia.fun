@@ -45,17 +45,15 @@ export function WalletPill() {
   const menuRef = useClickOutside(() => setMenuOpen(false));
   const history = useTxHistory(initiaAddress);
 
-  // If the wallet lib only exposed one form, derive the other from it.
   const bech32 = initiaAddress ?? (hexAddress ? hexToBech32(hexAddress) : null);
   const hex = hexAddress ?? null;
 
   if (!isConnected || !initiaAddress) {
     return (
       <Button
-        variant="hyperglow"
-        size="md"
-        className="min-w-[152px] font-semibold"
-        leading={<WalletIcon className="h-4 w-4" />}
+        variant="primary"
+        size="sm"
+        leading={<WalletIcon className="h-3.5 w-3.5" />}
         onClick={openConnect}
       >
         Connect wallet
@@ -84,50 +82,33 @@ export function WalletPill() {
       <button
         type="button"
         onClick={() => setMenuOpen((o) => !o)}
-        className={cn(
-          "group flex items-center gap-3 rounded-2xl ghost-border bg-white/[0.04] pl-2.5 pr-3 py-1.5 snappy transition-colors hover:bg-white/[0.07]",
-        )}
+        className="flex items-center gap-2 rounded-md bg-[#0F0F11] ghost-border px-2.5 py-1.5 transition-colors hover:bg-white/[0.04]"
       >
-        {/* Balance chip */}
-        <span className="flex items-baseline gap-1.5 rounded-xl bg-secondary-container/60 px-2.5 py-1">
-          <span className="font-editorial italic text-[1.05rem] leading-none text-editorial-ink">
-            {balanceDisplay}
-          </span>
-          <span className="font-mono text-[0.58rem] uppercase tracking-[0.22em] text-secondary">
-            INIT
-          </span>
+        <span className="h-1.5 w-1.5 rounded-full bg-secondary" />
+        <span className="font-mono text-[12px] text-on-surface">{display}</span>
+        <span className="h-3 w-px bg-white/10" />
+        <span className="font-mono text-[12px] tabular-nums text-on-surface-variant">
+          {balanceDisplay}
         </span>
-
-        {/* Address */}
-        <span className="flex flex-col items-start leading-tight">
-          <span className="font-mono text-[0.72rem] font-medium text-on-surface">{display}</span>
-          <span className="font-mono text-[0.58rem] uppercase tracking-[0.24em] text-secondary">
-            {INITIA.network}
-          </span>
-        </span>
-
-        <span className="h-2 w-2 rounded-full bg-secondary shadow-glow-secondary" />
+        <span className="font-mono text-[10px] text-on-surface-muted">INIT</span>
       </button>
 
       {menuOpen && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-80 rounded-[20px] bg-surface-container-high ghost-border-strong shadow-ambient-lg py-3 animate-fade-in">
-          <div className="px-4 pb-3">
-            <div className="font-mono text-[0.62rem] uppercase tracking-[0.28em] text-on-surface-muted">
-              Initia {INITIA.network}
+        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-80 rounded-xl bg-surface-container ghost-border py-2 shadow-ambient-lg animate-fade-in">
+          <div className="px-4 pt-2 pb-3">
+            <div className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-on-surface-muted">
+              Initia · {INITIA.network}
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="font-editorial italic text-headline-md leading-none text-editorial">
+            <div className="mt-1.5 flex items-baseline gap-2">
+              <span className="font-mono text-[22px] font-medium tabular-nums text-on-surface">
                 {balanceDisplay}
               </span>
-              <span className="font-mono text-label-sm uppercase tracking-[0.2em] text-on-surface-muted">
-                INIT
-              </span>
+              <span className="font-mono text-[11px] text-on-surface-muted">INIT</span>
             </div>
           </div>
 
-          <div className="h-px mx-4 bg-editorial/15" />
+          <div className="h-px mx-4 bg-white/[0.05]" />
 
-          {/* Both address encodings — same 20 bytes, different UI conventions */}
           <div className="flex flex-col gap-2 px-4 py-3">
             {bech32 && (
               <AddressRow
@@ -147,12 +128,12 @@ export function WalletPill() {
                 onCopy={() => copy("hex")}
               />
             )}
-            <span className="font-mono text-[0.55rem] uppercase tracking-[0.22em] text-on-surface-muted">
+            <span className="text-[10px] text-[#52525B]">
               same account · different encoding
             </span>
           </div>
 
-          <div className="h-px mx-4 bg-editorial/15" />
+          <div className="h-px mx-4 bg-white/[0.05]" />
           <MenuItem
             icon={<RefreshCcw className="h-3.5 w-3.5" />}
             label="Refresh balance"
@@ -176,15 +157,15 @@ export function WalletPill() {
 
           {history.records.length > 0 && (
             <>
-              <div className="h-px mx-4 my-1.5 bg-editorial/15" />
-              <div className="px-4 pb-2 pt-1 flex items-center justify-between">
-                <span className="font-mono text-[0.58rem] uppercase tracking-[0.28em] text-on-surface-muted">
+              <div className="h-px mx-4 my-1 bg-white/[0.05]" />
+              <div className="flex items-center justify-between px-4 pb-1 pt-1">
+                <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-on-surface-muted">
                   Recent activity
                 </span>
                 <button
                   type="button"
                   onClick={() => history.clear()}
-                  className="text-on-surface-muted hover:text-error snappy"
+                  className="text-on-surface-muted hover:text-error"
                   aria-label="Clear history"
                 >
                   <Trash2 className="h-3 w-3" />
@@ -197,7 +178,7 @@ export function WalletPill() {
                       href={`${INITIA.explorer}/${r.chainId}/txs/${r.hash}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-on-surface-variant hover:bg-white/[0.04] hover:text-on-surface snappy"
+                      className="flex items-center gap-3 rounded-md px-2 py-1.5 text-on-surface-variant hover:bg-white/[0.04] hover:text-on-surface"
                     >
                       <span
                         className={cn(
@@ -209,8 +190,8 @@ export function WalletPill() {
                               : "bg-secondary",
                         )}
                       />
-                      <span className="flex-1 truncate text-body-sm">{r.summary}</span>
-                      <span className="font-mono text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-muted">
+                      <span className="flex-1 truncate text-[12px]">{r.summary}</span>
+                      <span className="font-mono text-[10px] text-on-surface-muted">
                         {formatAgo(r.timestamp)}
                       </span>
                       <ExternalLink className="h-3 w-3 text-on-surface-muted" />
@@ -221,7 +202,7 @@ export function WalletPill() {
             </>
           )}
 
-          <div className="h-px mx-4 my-1.5 bg-editorial/15" />
+          <div className="h-px mx-4 my-1 bg-white/[0.05]" />
 
           <MenuItem
             icon={<LogOut className="h-3.5 w-3.5" />}
@@ -252,12 +233,12 @@ function AddressRow({
   onCopy: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.04] px-3 py-2 ghost-border">
+    <div className="flex items-center justify-between gap-2 rounded-md bg-[#0F0F11] ghost-border px-3 py-2">
       <div className="min-w-0 flex-1">
-        <div className="font-mono text-[0.56rem] uppercase tracking-[0.24em] text-on-surface-muted">
+        <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-on-surface-muted">
           {label}
         </div>
-        <div className="mt-0.5 font-mono text-body-sm text-on-surface" title={value}>
+        <div className="mt-0.5 font-mono text-[12px] text-on-surface" title={value}>
           {display}
         </div>
       </div>
@@ -265,12 +246,10 @@ function AddressRow({
         type="button"
         onClick={onCopy}
         aria-label={`Copy ${label}`}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-on-surface-variant hover:bg-white/[0.12] hover:text-on-surface snappy"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/[0.06] text-on-surface-variant hover:bg-white/[0.12] hover:text-on-surface"
       >
         {copied ? (
-          <span className="text-[0.58rem] font-mono uppercase tracking-[0.22em] text-secondary">
-            ok
-          </span>
+          <span className="text-[10px] font-mono text-secondary">ok</span>
         ) : (
           <Copy className="h-3 w-3" />
         )}
@@ -295,9 +274,9 @@ function MenuItem({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-3 px-4 py-2 text-left text-body-sm snappy transition-colors",
+        "flex w-full items-center gap-3 px-4 py-2 text-left text-[12.5px] transition-colors",
         tone === "danger"
-          ? "text-error hover:bg-error-container/40"
+          ? "text-error hover:bg-error/10"
           : "text-on-surface-variant hover:bg-white/[0.04] hover:text-on-surface",
       )}
     >

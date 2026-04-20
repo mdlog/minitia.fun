@@ -6,6 +6,7 @@ export interface SectionHeaderProps {
   title: ReactNode;
   description?: ReactNode;
   trailing?: ReactNode;
+  action?: ReactNode;
   align?: "left" | "center";
   className?: string;
 }
@@ -15,33 +16,32 @@ export function SectionHeader({
   title,
   description,
   trailing,
+  action,
   align = "left",
   className,
 }: SectionHeaderProps) {
   return (
     <div
       className={cn(
-        "flex flex-wrap items-end justify-between gap-6",
+        "flex flex-wrap items-end justify-between gap-4",
         align === "center" && "justify-center text-center",
         className,
       )}
     >
-      <div className="max-w-3xl">
+      <div className="flex flex-col gap-1 min-w-0">
         {eyebrow && (
-          <span className="inline-flex rounded-full bg-white/[0.04] px-3 py-1 text-[0.68rem] font-mono uppercase tracking-[0.22em] text-secondary">
+          <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-on-surface-muted">
             {eyebrow}
           </span>
         )}
-        <h2 className={cn("mt-3 text-headline-lg font-display leading-tight text-on-surface")}>
-          {title}
-        </h2>
+        <h2 className="text-[17px] font-semibold tracking-tight text-on-surface">{title}</h2>
         {description && (
-          <p className="mt-3 max-w-2xl text-body-lg leading-relaxed text-on-surface-variant">
-            {description}
-          </p>
+          <p className="text-[13px] text-on-surface-variant">{description}</p>
         )}
       </div>
-      {trailing && <div className="flex items-center gap-3">{trailing}</div>}
+      {(trailing || action) && (
+        <div className="flex items-center gap-2">{action ?? trailing}</div>
+      )}
     </div>
   );
 }

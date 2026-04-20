@@ -2,10 +2,6 @@ import { Droplet, ExternalLink } from "lucide-react";
 import { useInitiaAccount } from "@/hooks/useInitiaAccount";
 import { formatInitBalance, INITIA } from "@/lib/initia";
 
-/**
- * Thin testnet notice strip — hidden on mainnet.
- * Shows faucet CTA when connected wallet has < 1 INIT, otherwise a generic testnet tag.
- */
 export function TestnetBanner() {
   const { isConnected, balance } = useInitiaAccount();
 
@@ -15,14 +11,19 @@ export function TestnetBanner() {
   const lowBalance = isConnected && initAmount < 1;
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-editorial/20 bg-editorial-container/40 px-6 py-2 md:px-10">
-      <div className="flex items-center gap-3 text-[0.62rem] font-mono uppercase tracking-[0.28em] text-editorial">
-        <span className="h-1.5 w-1.5 rounded-full bg-editorial animate-pulse" />
-        <span>Initia Testnet · {INITIA.chainId}</span>
+    <div className="flex items-center justify-between gap-4 rounded-md bg-[#1E3A8A]/20 px-3 py-1.5 ghost-border">
+      <div className="flex items-center gap-2 text-[11px] text-[#60A5FA]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#3B82F6] animate-pulse" />
+        <span className="font-medium">Initia Testnet</span>
+        <span className="text-on-surface-muted">·</span>
+        <span className="font-mono text-on-surface-variant">{INITIA.chainId}</span>
         {isConnected && (
-          <span className="hidden md:inline text-on-surface-muted">
-            · bal <span className="text-editorial-ink">{formatInitBalance(balance)}</span> INIT
-          </span>
+          <>
+            <span className="text-on-surface-muted">·</span>
+            <span className="hidden md:inline font-mono text-on-surface-variant">
+              bal <span className="text-on-surface">{formatInitBalance(balance)}</span> INIT
+            </span>
+          </>
         )}
       </div>
 
@@ -30,14 +31,14 @@ export function TestnetBanner() {
         href={INITIA.faucet}
         target="_blank"
         rel="noreferrer"
-        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.62rem] font-mono uppercase tracking-[0.22em] snappy transition-colors ${
+        className={
           lowBalance
-            ? "bg-editorial text-surface animate-pulse"
-            : "bg-white/[0.05] text-on-surface-variant hover:bg-white/[0.08] hover:text-editorial-ink"
-        }`}
+            ? "inline-flex items-center gap-1 rounded-md bg-[#2563EB] px-2.5 py-1 text-[11px] font-medium text-white animate-pulse"
+            : "inline-flex items-center gap-1 text-[11px] text-on-surface-variant hover:text-on-surface"
+        }
       >
         <Droplet className="h-3 w-3" />
-        {lowBalance ? "Grab testnet INIT" : "Faucet"}
+        <span>{lowBalance ? "Grab testnet INIT" : "Faucet"}</span>
         <ExternalLink className="h-3 w-3" />
       </a>
     </div>

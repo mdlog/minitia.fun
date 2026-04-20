@@ -16,28 +16,27 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const inputId = id ?? rest.name;
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-1.5">
       {label && (
-        <label
-          htmlFor={inputId}
-          className="text-[0.68rem] font-mono uppercase tracking-[0.22em] text-on-surface-variant"
-        >
+        <label htmlFor={inputId} className="text-[11px] font-medium text-on-surface-variant">
           {label}
         </label>
       )}
       <div
         className={cn(
-          "relative flex items-center rounded-2xl surface-nested ghost-border px-1 transition-all duration-200",
-          "focus-within:-translate-y-0.5 focus-within:shadow-[0_0_0_1px_rgba(91,140,255,0.28),0_0_0_6px_rgba(91,140,255,0.1)]",
-          error && "shadow-[0_0_0_1px_rgba(255,84,112,0.35),0_0_0_6px_rgba(255,84,112,0.08)]",
+          "relative flex items-center rounded-lg bg-[#0F0F11] ghost-border transition-all",
+          "focus-within:ring-1 focus-within:ring-primary/50",
+          error && "ring-1 ring-error/50",
         )}
       >
-        {leading && <span className="pl-3 text-on-surface-variant">{leading}</span>}
+        {leading && (
+          <span className="pl-3 font-mono text-[13px] text-on-surface-muted">{leading}</span>
+        )}
         <input
           ref={ref}
           id={inputId}
           className={cn(
-            "w-full bg-transparent px-3 py-3 text-body-md text-on-surface outline-none placeholder:text-on-surface-muted",
+            "w-full bg-transparent px-3 py-2.5 text-[13.5px] text-on-surface outline-none placeholder:text-[#52525B]",
             leading && "pl-2",
             trailing && "pr-2",
             className,
@@ -47,9 +46,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         {trailing && <span className="pr-3 text-on-surface-variant">{trailing}</span>}
       </div>
       {(hint || error) && (
-        <p className={cn("text-body-sm", error ? "text-error" : "text-on-surface-muted")}>
+        <span className={cn("text-[11px]", error ? "text-[#FB7185]" : "text-[#52525B]")}>
           {error ?? hint}
-        </p>
+        </span>
       )}
     </div>
   );

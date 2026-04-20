@@ -1,12 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, ExternalLink, Flame, Info, Loader2, MessageCircle, RefreshCcw, Send, Trophy, Users, Wallet, Zap } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Copy,
+  ExternalLink,
+  Flame,
+  Info,
+  Loader2,
+  MessageCircle,
+  RefreshCw,
+  Send,
+  Trophy,
+  Users,
+  Wallet,
+  Zap,
+} from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
+import { Stat } from "@/components/ui/Stat";
 import { useInitiaAccount } from "@/hooks/useInitiaAccount";
 import { useAppchainBalance } from "@/hooks/useAppchainBalance";
 import { useAppchainFaucet } from "@/hooks/useAppchainFaucet";
@@ -20,7 +35,6 @@ import { APPCHAIN } from "@/lib/initia";
 import { cn } from "@/lib/cn";
 
 const SLIPPAGE_OPTIONS = [0.5, 1, 1.5, 3] as const;
-/** Mirrors bonding_curve.move const. Hackathon demo value: 10 MIN in umin. */
 const GRADUATION_THRESHOLD_INIT = 10_000_000n;
 
 function formatMin(microUnits: bigint, digits = 4): string {
@@ -36,7 +50,6 @@ function shortAddr(s: string): string {
   return s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-6)}` : s;
 }
 
-/** Newton iteration integer sqrt for bigint — mirrors math128::sqrt on chain. */
 function bigintSqrt(n: bigint): bigint {
   if (n < 2n) return n;
   let x = n;
@@ -75,22 +88,15 @@ export default function Trade() {
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [amount, setAmount] = useState("0.5");
   const [slippage, setSlippage] = useState<number>(1);
+  const [tab, setTab] = useState<"trades" | "holders" | "comments">("trades");
 
-  // Convert amount string to micro units for the side
   const amountMicro = useMemo(() => {
     const n = parseFloat(amount || "0");
     if (Number.isNaN(n) || n <= 0) return 0n;
-    // Buy: amount is in MIN, multiply by 1e6
-    // Sell: amount is in tokens (we treat 1 token = 1 micro-unit)
     if (side === "BUY") return BigInt(Math.floor(n * 1_000_000));
     return BigInt(Math.floor(n));
   }, [amount, side]);
 
-  // Estimate output using the same integral linear-curve math the Move
-  // contract executes (bonding_curve.move tokens_out_for_buy/gross_for_sell):
-  //   spot_scaled = base*1e6 + slope*supply  (spot price * 1e6, integer)
-  //   BUY : x = (sqrt(spot_scaled^2 + 2*slope*1e6*net) - spot_scaled)/slope
-  //   SELL: gross = (2*spot_scaled*burn - slope*burn^2) / (2*1e6)
   const expectedOut = useMemo(() => {
     if (!pool.data || !pool.data.exists || amountMicro === 0n) return 0n;
     const base = pool.data.basePrice;
@@ -110,7 +116,6 @@ export default function Trade() {
       return (root - spotScaled) / slope;
     }
 
-    // SELL: amountMicro is the burn count in integer token units.
     const burn = amountMicro;
     let gross: bigint;
     if (slope === 0n) {
@@ -128,7 +133,6 @@ export default function Trade() {
     return (expectedOut * BigInt(Math.floor((100 - slippage) * 100))) / 10000n;
   }, [expectedOut, slippage]);
 
-  // Reset amount when switching side
   useEffect(() => {
     setAmount(side === "BUY" ? "0.5" : "100");
   }, [side]);
@@ -148,9 +152,7 @@ export default function Trade() {
 
   const noPool = pool.data && !pool.data.exists;
   const latestHeight = trades.data?.[0]?.height ?? 0;
-  const lastTrade = trades.data?.[0];
 
-  // Price flash: compare current vs previous spot price; toggle flash class.
   const prevSpotRef = useRef<bigint | null>(null);
   const [flashTone, setFlashTone] = useState<"up" | "down" | null>(null);
   useEffect(() => {
@@ -166,13 +168,11 @@ export default function Trade() {
     prevSpotRef.current = spot;
   }, [pool.data?.spotPrice]);
 
-  // Social microstats: velocity (trades in last 15 min) + unique traders.
   const { velocity15m, uniqueTraders, isHot } = useMemo(() => {
     const list = trades.data ?? [];
     if (list.length === 0 || latestHeight === 0) {
       return { velocity15m: 0, uniqueTraders: 0, isHot: false };
     }
-    // ~1 block/s. 15 min = 900 blocks.
     const cutoff = latestHeight - 900;
     const recent = list.filter((t) => t.height >= cutoff);
     const traders = new Set(list.map((t) => t.trader));
@@ -184,632 +184,538 @@ export default function Trade() {
   }, [trades.data, latestHeight]);
 
   return (
-    <div className="page-shell">
-      <section className="page-hero grain dotgrid overflow-hidden">
-        <div className="relative px-6 py-8 md:px-10 md:py-10">
-          <div className="flex flex-wrap items-start gap-6">
-            <Avatar symbol={ticker} size="xl" className="shrink-0" />
-            <div className="flex min-w-0 flex-1 flex-col gap-3">
-              <span className="font-mono text-[0.62rem] uppercase tracking-[0.28em] text-editorial">
-                § trading desk
-              </span>
-              <h1
-                className="flex items-end gap-4 leading-[0.82] text-editorial-ink"
-                style={{ fontSize: "clamp(3.5rem, 11vw, 9rem)" }}
-              >
-                <span className="font-editorial italic text-editorial truncate">
-                  {ticker.toLowerCase()}
+    <div className="flex flex-col gap-4 pb-8">
+      {/* Token header strip */}
+      <Card padded="md">
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="flex items-center gap-3">
+            <Avatar symbol={ticker} size="lg" />
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[17px] font-semibold tracking-tight text-on-surface">
+                  ${ticker}
                 </span>
-                <span className="pb-3 font-mono text-[clamp(0.9rem,1.2vw,1.1rem)] font-normal uppercase tracking-[0.28em] text-on-surface-muted">
-                  / MIN
+                <span className="text-[12px] text-on-surface-muted">/ MIN</span>
+              </div>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <span className="font-mono text-[11px] text-[#52525B]">
+                  {APPCHAIN.deployedAddress.slice(0, 8)}…{APPCHAIN.deployedAddress.slice(-4)}
                 </span>
-              </h1>
-
-              <p className="max-w-2xl text-body-md leading-relaxed text-on-surface-variant">
-                Follow spot price, liquidity, community flow, and execution inputs from one cleaner market surface.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {isHot && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-2.5 py-1 font-mono text-[0.62rem] font-medium uppercase tracking-[0.22em] text-amber-300">
-                    <Flame className="h-3 w-3" /> Hot · {velocity15m} trades / 15m
-                  </span>
-                )}
-                {!isHot && velocity15m > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 font-mono text-[0.62rem] font-medium uppercase tracking-[0.22em] text-on-surface-variant">
-                    {velocity15m} trade{velocity15m === 1 ? "" : "s"} / 15m
-                  </span>
-                )}
-                {uniqueTraders > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 font-mono text-[0.62rem] font-medium uppercase tracking-[0.22em] text-on-surface-variant">
-                    <Users className="h-3 w-3" /> {uniqueTraders} trader
-                    {uniqueTraders === 1 ? "" : "s"}
-                  </span>
-                )}
-                <a
-                  href={`${APPCHAIN.rpc}/tx?hash=0x${lastTrade?.hash ?? ""}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 font-mono text-[0.62rem] font-medium uppercase tracking-[0.22em] text-on-surface-variant hover:text-editorial-ink"
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(APPCHAIN.deployedAddress)}
+                  className="text-[#52525B] hover:text-on-surface-variant"
+                  aria-label="Copy module address"
                 >
-                  {APPCHAIN.deployedAddress.slice(0, 8)}…{APPCHAIN.deployedAddress.slice(-4)} · bonding_curve
-                </a>
+                  <Copy className="h-3 w-3" />
+                </button>
               </div>
             </div>
-
-            {pool.data?.exists && (
-              <div className="flex shrink-0 flex-col items-end gap-3 lg:min-w-[320px]">
-                <div className="flex flex-col items-end gap-1">
-                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.28em] text-on-surface-muted">
-                    spot · live
-                  </span>
+          </div>
+          <div className="hidden h-8 w-px bg-white/[0.06] md:block" />
+          {pool.data?.exists && (
+            <>
+              <Stat
+                label="Price"
+                value={
                   <span
                     className={cn(
-                      "font-editorial italic text-[clamp(2.5rem,6vw,4.5rem)] leading-none tabular-nums text-editorial-ink",
                       flashTone === "up" && "animate-flash-up",
                       flashTone === "down" && "animate-flash-down",
                     )}
                   >
                     {formatMin(pool.data.spotPrice, 6)}
                   </span>
-                  <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                    MIN / token
+                }
+                unit="MIN"
+                tone="info"
+              />
+              <Stat
+                label="Liquidity"
+                value={formatMin(pool.data.initReserve, 2)}
+                unit="MIN"
+              />
+              <Stat
+                label="Supply"
+                value={Number(pool.data.tokenSupply).toLocaleString()}
+                unit={`$${ticker}`}
+              />
+              <Stat
+                label="Trades"
+                value={pool.data.tradeCount.toLocaleString()}
+              />
+              <div className="ml-auto flex min-w-[180px] flex-col items-end gap-1.5">
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="text-on-surface-muted">Graduation</span>
+                  <span className="font-mono tabular-nums text-on-surface">
+                    {graduationProgress.toFixed(1)}%
                   </span>
                 </div>
-                <div className="w-full max-w-[320px] flex flex-col gap-1.5">
-                  <ProgressBar value={graduationProgress} tone="graduation" size="sm" />
-                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                    {graduationProgress.toFixed(1)}% to graduation · 10 MIN
-                  </span>
-                </div>
+                <ProgressBar value={graduationProgress} tone="primary" size="sm" />
+                <span className="font-mono text-[10.5px] text-[#52525B]">
+                  {formatMin(pool.data.initReserve, 2)} / 10 MIN
+                </span>
               </div>
-            )}
-          </div>
-
-          {/* Last trade banner */}
-          {lastTrade && (
-            <div className="mt-6 flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.03] px-4 py-2.5 hairline">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[0.58rem] font-medium uppercase tracking-[0.22em]",
-                  lastTrade.side === "BUY"
-                    ? "bg-secondary-container/70 text-secondary"
-                    : "bg-red-500/15 text-red-300",
-                )}
-              >
-                {lastTrade.side === "BUY" ? (
-                  <ArrowUp className="h-3 w-3" />
-                ) : (
-                  <ArrowDown className="h-3 w-3" />
-                )}
-                {lastTrade.side}
-              </span>
-              <Link
-                to={`/u/${lastTrade.trader}`}
-                className="font-mono text-body-sm text-on-surface-variant hover:text-editorial-ink snappy"
-              >
-                {shortAddr(lastTrade.trader)}
-              </Link>
-              <span className="font-mono text-body-sm text-on-surface-variant">
-                {lastTrade.side === "BUY" ? "bought" : "sold"}
-              </span>
-              <span className="font-mono text-body-sm font-semibold text-on-surface tabular-nums">
-                {Number(lastTrade.tokenAmount).toLocaleString()}
-              </span>
-              <span className="font-editorial italic text-body-sm text-editorial">${ticker}</span>
-              <span className="font-mono text-body-sm text-on-surface-muted">·</span>
-              <span className="font-mono text-body-sm text-on-surface tabular-nums">
-                {formatMin(lastTrade.initAmount, 4)} MIN
-              </span>
-              <span className="ml-auto font-mono text-[0.6rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                {relativeTime(lastTrade.height, latestHeight)} · #{lastTrade.height}
-              </span>
-            </div>
+            </>
           )}
         </div>
-      </section>
+
+        {(isHot || velocity15m > 0 || uniqueTraders > 0) && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {isHot && (
+              <Chip tone="warning" leading={<Flame className="h-3 w-3" />}>
+                Hot · {velocity15m}/15m
+              </Chip>
+            )}
+            {!isHot && velocity15m > 0 && (
+              <Chip tone="neutral">
+                {velocity15m} trade{velocity15m === 1 ? "" : "s"} / 15m
+              </Chip>
+            )}
+            {uniqueTraders > 0 && (
+              <Chip tone="muted" leading={<Users className="h-3 w-3" />}>
+                {uniqueTraders} trader{uniqueTraders === 1 ? "" : "s"}
+              </Chip>
+            )}
+          </div>
+        )}
+      </Card>
 
       {noPool && (
-        <Card tier="base" padded="lg" className="flex flex-col gap-4">
+        <Card padded="lg" className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-on-surface-variant">
             <Info className="h-4 w-4" />
-            <span className="font-mono text-[0.68rem] uppercase tracking-[0.22em]">
+            <span className="text-[13px] font-medium">
               No bonding curve pool exists for ${ticker}
             </span>
           </div>
-          <p className="text-body-md text-on-surface-variant max-w-2xl">
-            This ticker was launched via <code>token_factory</code> before Launchpad started
-            bundling pool creation. Open a curve with default parameters
-            (base_price=1000, slope=10) to enable trading. Permissionless -- any wallet
-            can do it, and gas is paid in MIN.
+          <p className="max-w-2xl text-[12.5px] text-on-surface-variant">
+            This ticker was launched via <code className="font-mono">token_factory</code> before
+            Launchpad started bundling pool creation. Open a curve with default parameters
+            (base_price=1000, slope=10) to enable trading. Permissionless — any wallet can do it.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div>
             <Button
-              size="md"
-              variant="hyperglow"
+              variant="primary"
               leading={
-                isCreatingPool ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />
+                isCreatingPool ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Zap className="h-3.5 w-3.5" />
+                )
               }
               disabled={isCreatingPool || !isConnected}
               onClick={async () => {
-                if (!isConnected) {
-                  openConnect();
-                  return;
-                }
+                if (!isConnected) return openConnect();
                 const hash = await createPool(ticker);
-                if (hash) {
-                  setTimeout(() => pool.refetch(), 1500);
-                }
+                if (hash) setTimeout(() => pool.refetch(), 1500);
               }}
             >
               {isCreatingPool ? "Opening curve…" : `Open curve for $${ticker}`}
             </Button>
-            {!isConnected && (
-              <span className="self-center font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                Connect wallet to open curve
-              </span>
-            )}
           </div>
         </Card>
       )}
 
       {pool.data?.exists && (
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="flex flex-col gap-5">
-            {/* Stat strip */}
-            <Card tier="base" padded="lg">
-              <div className="grid gap-6 md:grid-cols-4">
-                <Stat
-                  label="spot price"
-                  value={`${formatMin(pool.data.spotPrice, 6)}`}
-                  unit="MIN/token"
-                  accent="text-editorial"
-                />
-                <Stat
-                  label="liquidity"
-                  value={`${formatMin(pool.data.initReserve, 2)}`}
-                  unit="MIN"
-                />
-                <Stat
-                  label="supply"
-                  value={Number(pool.data.tokenSupply).toLocaleString()}
-                  unit={`$${ticker}`}
-                />
-                <Stat
-                  label="trades"
-                  value={pool.data.tradeCount.toLocaleString()}
-                  unit="all-time"
-                />
-              </div>
-              <div className="mt-5 flex items-center justify-between gap-4 text-body-sm text-on-surface-variant">
-                <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-secondary animate-pulse" />
-                  on-chain · auto-refresh 8s
-                </span>
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="flex min-w-0 flex-col gap-4">
+            {/* Tabs card: trades / holders / comments */}
+            <Card padded="none" className="overflow-hidden">
+              <div className="flex items-center gap-4 border-b border-white/[0.05] px-4">
+                {(
+                  [
+                    { k: "trades", label: "Recent trades" },
+                    { k: "holders", label: "Holders" },
+                    { k: "comments", label: "Comments" },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.k}
+                    type="button"
+                    onClick={() => setTab(t.k)}
+                    className={cn(
+                      "relative py-3 text-[12.5px] font-medium transition-colors",
+                      tab === t.k
+                        ? "text-on-surface"
+                        : "text-on-surface-muted hover:text-on-surface-variant",
+                    )}
+                  >
+                    {t.label}
+                    {tab === t.k && (
+                      <span className="absolute -bottom-px left-0 right-0 h-px bg-[#60A5FA]" />
+                    )}
+                  </button>
+                ))}
                 <button
                   type="button"
                   onClick={() => {
                     pool.refetch();
                     holding.refetch();
                     trades.refetch();
+                    holders.refetch();
+                    comments.refetch();
                   }}
-                  className="inline-flex items-center gap-1.5 font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted hover:text-editorial-ink snappy"
+                  className="ml-auto flex items-center gap-1.5 py-3 text-[11px] text-on-surface-muted hover:text-on-surface"
                 >
-                  <RefreshCcw className={cn("h-3 w-3", (pool.isFetching || trades.isFetching) && "animate-spin")} />
+                  <RefreshCw
+                    className={cn(
+                      "h-3 w-3",
+                      (pool.isFetching || trades.isFetching) && "animate-spin",
+                    )}
+                  />
                   Refresh
                 </button>
               </div>
-            </Card>
-
-            {/* Recent trades */}
-            <Card tier="base" padded="md" className="flex flex-col gap-4">
-              <div className="flex items-end gap-3">
-                <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-                  § tape
-                </span>
-                <h2 className="text-headline-sm font-editorial italic text-editorial-ink">
-                  Recent trades
-                </h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-body-md">
-                  <thead>
-                    <tr className="text-left font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                      <th className="px-3 py-2">Side</th>
-                      <th className="px-3 py-2">Trader</th>
-                      <th className="px-3 py-2 text-right">Amount</th>
-                      <th className="px-3 py-2 text-right">MIN</th>
-                      <th className="px-3 py-2 text-right">Height</th>
-                      <th className="px-3 py-2"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="p-4">
+                {tab === "trades" && (
+                  <div className="flex flex-col gap-1">
+                    <div className="grid grid-cols-[60px_minmax(140px,1fr)_1fr_1fr_1fr_32px] gap-2 pb-1.5 text-[10.5px] text-[#52525B]">
+                      <span>Side</span>
+                      <span>Trader</span>
+                      <span className="text-right">Amount</span>
+                      <span className="text-right">MIN</span>
+                      <span className="text-right">Height</span>
+                      <span />
+                    </div>
                     {trades.data && trades.data.length > 0 ? (
                       trades.data.map((t) => (
-                        <tr key={t.hash} className="text-on-surface hover:bg-white/[0.03] snappy">
-                          <td className="px-3 py-2.5">
-                            <Chip tone={t.side === "BUY" ? "success" : "danger"} dense leading={t.side === "BUY" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}>
-                              {t.side}
-                            </Chip>
-                          </td>
-                          <td className="px-3 py-2.5 font-mono text-body-sm text-on-surface-variant">
-                            <Link
-                              to={`/u/${t.trader}`}
-                              className="hover:text-editorial-ink snappy"
-                            >
-                              {shortAddr(t.trader)}
-                            </Link>
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono">
-                            {Number(t.tokenAmount).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono">
-                            {formatMin(t.initAmount, 4)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono text-on-surface-muted">
-                            {latestHeight ? relativeTime(t.height, latestHeight) : `#${t.height}`}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <a
-                              href={`${APPCHAIN.rpc}/tx?hash=0x${t.hash}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-on-surface-muted hover:text-secondary"
-                              aria-label="View tx"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="px-3 py-6 text-center text-body-sm text-on-surface-muted">
-                          {trades.isFetching ? "Loading…" : "No trades yet — be the first."}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-
-            {/* Holders leaderboard */}
-            <Card tier="base" padded="md" className="flex flex-col gap-4">
-              <div className="flex items-end justify-between gap-3">
-                <div className="flex items-end gap-3">
-                  <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-                    § leaderboard
-                  </span>
-                  <h2 className="text-headline-sm font-editorial italic text-editorial-ink">
-                    Top holders
-                  </h2>
-                </div>
-                <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                  {holders.data?.length ?? 0} on curve
-                </span>
-              </div>
-              {holders.isLoading ? (
-                <div className="py-6 text-center font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                  Aggregating…
-                </div>
-              ) : !holders.data || holders.data.length === 0 ? (
-                <div className="py-6 text-center text-body-sm text-on-surface-muted">
-                  No holders yet. Be the first trader.
-                </div>
-              ) : (
-                <div className="flex flex-col divide-y divide-editorial/15">
-                  {holders.data.map((h, i) => {
-                    const isFirst = i === 0;
-                    const isPodium = i < 3;
-                    return (
-                      <Link
-                        to={`/u/${h.address.replace(/^0x/, "0x")}`}
-                        key={h.address}
-                        className="group flex items-center gap-3 py-2.5 hover:bg-white/[0.03] snappy -mx-2 px-2 rounded-md"
-                      >
-                        <span
-                          className={cn(
-                            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-[0.7rem] font-semibold",
-                            isFirst
-                              ? "bg-amber-400/25 text-amber-300"
-                              : isPodium
-                                ? "bg-editorial/20 text-editorial"
-                                : "bg-white/[0.04] text-on-surface-variant",
-                          )}
+                        <div
+                          key={t.hash}
+                          className="grid grid-cols-[60px_minmax(140px,1fr)_1fr_1fr_1fr_32px] items-center gap-2 border-b border-white/[0.03] py-1.5 text-[12px] font-mono tabular-nums last:border-b-0"
                         >
-                          {isPodium ? <Trophy className="h-3.5 w-3.5" /> : i + 1}
-                        </span>
-                        <Avatar symbol={h.address.slice(2, 6).toUpperCase()} size="sm" />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-mono text-body-sm text-on-surface">
-                            {shortAddr(h.address)}
-                          </div>
-                          <div className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                            {h.trades} trade{h.trades === 1 ? "" : "s"}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-mono text-body-sm text-on-surface tabular-nums">
-                            {Number(h.balance).toLocaleString()}
-                          </div>
-                          <div className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                            ${ticker}
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
-
-            {/* Comments */}
-            <Card tier="base" padded="md" className="flex flex-col gap-4">
-              <div className="flex items-end justify-between gap-3">
-                <div className="flex items-end gap-3">
-                  <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-editorial">
-                    § feed
-                  </span>
-                  <h2 className="text-headline-sm font-editorial italic text-editorial-ink">
-                    Comments
-                  </h2>
-                </div>
-                <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                  {comments.data?.length ?? 0} on-chain
-                </span>
-              </div>
-              {/* Composer */}
-              <div className="flex flex-col gap-2 rounded-xl bg-white/[0.03] p-3 hairline">
-                <textarea
-                  value={commentBody}
-                  onChange={(e) => setCommentBody(e.target.value.slice(0, 280))}
-                  placeholder={
-                    isConnected
-                      ? `What's your take on $${ticker}?`
-                      : "Connect a wallet to post on-chain"
-                  }
-                  disabled={!isConnected || isPosting}
-                  rows={2}
-                  className="w-full resize-none bg-transparent text-body-md text-on-surface placeholder:text-on-surface-muted focus:outline-none disabled:cursor-not-allowed"
-                />
-                <div className="flex items-center justify-between gap-3">
-                  <span
-                    className={cn(
-                      "font-mono text-[0.6rem] uppercase tracking-[0.2em]",
-                      commentBody.length > 260 ? "text-amber-300" : "text-on-surface-muted",
-                    )}
-                  >
-                    {commentBody.length}/280 · on-chain · immutable
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    leading={isPosting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                    disabled={!isConnected || !commentBody.trim() || isPosting}
-                    onClick={async () => {
-                      const ok = await postComment(ticker, commentBody);
-                      if (ok) {
-                        setCommentBody("");
-                        setTimeout(() => comments.refetch(), 1200);
-                      }
-                    }}
-                  >
-                    {isPosting ? "Posting…" : "Post"}
-                  </Button>
-                </div>
-              </div>
-              {/* Feed */}
-              {comments.isLoading ? (
-                <div className="py-6 text-center font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                  Loading feed…
-                </div>
-              ) : !comments.data || comments.data.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-8 text-center">
-                  <MessageCircle className="h-6 w-6 text-on-surface-muted" />
-                  <span className="text-body-sm text-on-surface-muted">
-                    No comments yet. Start the thread.
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-col divide-y divide-editorial/15">
-                  {comments.data.map((c) => (
-                    <div key={`${c.hash}-${c.index}`} className="flex gap-3 py-3">
-                      <Avatar symbol={c.author.slice(2, 6).toUpperCase()} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            to={`/u/${c.author}`}
-                            className="font-mono text-body-sm text-on-surface hover:text-editorial-ink"
+                          <span
+                            className={
+                              t.side === "BUY" ? "text-[#34D399]" : "text-[#FB7185]"
+                            }
                           >
-                            {shortAddr(c.author)}
+                            {t.side}
+                          </span>
+                          <Link
+                            to={`/u/${t.trader}`}
+                            className="truncate text-on-surface-variant hover:text-on-surface"
+                          >
+                            {shortAddr(t.trader)}
                           </Link>
-                          <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-muted">
-                            · {latestHeight ? relativeTime(c.blockHeight, latestHeight) : `#${c.blockHeight}`}
+                          <span className="text-right text-on-surface-variant">
+                            {Number(t.tokenAmount).toLocaleString()}
+                          </span>
+                          <span className="text-right text-on-surface-variant">
+                            {formatMin(t.initAmount, 4)}
+                          </span>
+                          <span className="text-right text-on-surface-muted">
+                            {latestHeight ? relativeTime(t.height, latestHeight) : `#${t.height}`}
                           </span>
                           <a
-                            href={`${APPCHAIN.rpc}/tx?hash=0x${c.hash}`}
+                            href={`${APPCHAIN.rpc}/tx?hash=0x${t.hash}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="ml-auto text-on-surface-muted hover:text-secondary"
+                            className="text-on-surface-muted hover:text-on-surface"
                             aria-label="View tx"
                           >
                             <ExternalLink className="h-3 w-3" />
                           </a>
                         </div>
-                        <p className="mt-1 whitespace-pre-wrap break-words text-body-md text-on-surface-variant">
-                          {c.body}
-                        </p>
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-[12.5px] text-on-surface-muted">
+                        {trades.isFetching ? "Loading…" : "No trades yet — be the first."}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {tab === "holders" && (
+                  <div className="flex flex-col divide-y divide-white/[0.05]">
+                    {holders.isLoading ? (
+                      <div className="py-6 text-center text-[11.5px] text-on-surface-muted">
+                        Aggregating…
+                      </div>
+                    ) : !holders.data || holders.data.length === 0 ? (
+                      <div className="py-6 text-center text-[12.5px] text-on-surface-muted">
+                        No holders yet.
+                      </div>
+                    ) : (
+                      holders.data.map((h, i) => (
+                        <Link
+                          to={`/u/${h.address}`}
+                          key={h.address}
+                          className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 hover:bg-white/[0.02]"
+                        >
+                          <span
+                            className={cn(
+                              "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold",
+                              i === 0
+                                ? "bg-[#F59E0B]/20 text-[#FBBF24]"
+                                : i < 3
+                                  ? "bg-[#2563EB]/15 text-[#60A5FA]"
+                                  : "bg-white/[0.04] text-on-surface-variant",
+                            )}
+                          >
+                            {i < 3 ? <Trophy className="h-3 w-3" /> : i + 1}
+                          </span>
+                          <Avatar symbol={h.address.slice(2, 6).toUpperCase()} size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-mono text-[12.5px] text-on-surface">
+                              {shortAddr(h.address)}
+                            </div>
+                            <div className="font-mono text-[10.5px] text-on-surface-muted">
+                              {h.trades} trade{h.trades === 1 ? "" : "s"}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-mono text-[12.5px] tabular-nums text-on-surface">
+                              {Number(h.balance).toLocaleString()}
+                            </div>
+                            <div className="font-mono text-[10.5px] text-on-surface-muted">
+                              ${ticker}
+                            </div>
+                          </div>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                )}
+                {tab === "comments" && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2 rounded-lg bg-[#0F0F11] p-3 ghost-border">
+                      <textarea
+                        value={commentBody}
+                        onChange={(e) => setCommentBody(e.target.value.slice(0, 280))}
+                        placeholder={
+                          isConnected
+                            ? `What's your take on $${ticker}?`
+                            : "Connect a wallet to post on-chain"
+                        }
+                        disabled={!isConnected || isPosting}
+                        rows={2}
+                        className="w-full resize-none bg-transparent text-[13px] text-on-surface outline-none placeholder:text-[#52525B] disabled:cursor-not-allowed"
+                      />
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={cn(
+                            "font-mono text-[10.5px]",
+                            commentBody.length > 260 ? "text-[#FBBF24]" : "text-[#52525B]",
+                          )}
+                        >
+                          {commentBody.length}/280 · on-chain
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          leading={
+                            isPosting ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Send className="h-3 w-3" />
+                            )
+                          }
+                          disabled={!isConnected || !commentBody.trim() || isPosting}
+                          onClick={async () => {
+                            const ok = await postComment(ticker, commentBody);
+                            if (ok) {
+                              setCommentBody("");
+                              setTimeout(() => comments.refetch(), 1200);
+                            }
+                          }}
+                        >
+                          {isPosting ? "Posting…" : "Post"}
+                        </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    {comments.isLoading ? (
+                      <div className="py-6 text-center text-[11.5px] text-on-surface-muted">
+                        Loading feed…
+                      </div>
+                    ) : !comments.data || comments.data.length === 0 ? (
+                      <div className="flex flex-col items-center gap-2 py-6 text-center">
+                        <MessageCircle className="h-5 w-5 text-on-surface-muted" />
+                        <span className="text-[12.5px] text-on-surface-muted">
+                          No comments yet. Start the thread.
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col divide-y divide-white/[0.05]">
+                        {comments.data.map((c) => (
+                          <div key={`${c.hash}-${c.index}`} className="flex gap-3 py-3">
+                            <Avatar symbol={c.author.slice(2, 6).toUpperCase()} size="sm" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Link
+                                  to={`/u/${c.author}`}
+                                  className="font-mono text-[12px] text-on-surface hover:text-on-surface-variant"
+                                >
+                                  {shortAddr(c.author)}
+                                </Link>
+                                <span className="font-mono text-[10.5px] text-on-surface-muted">
+                                  ·{" "}
+                                  {latestHeight
+                                    ? relativeTime(c.blockHeight, latestHeight)
+                                    : `#${c.blockHeight}`}
+                                </span>
+                                <a
+                                  href={`${APPCHAIN.rpc}/tx?hash=0x${c.hash}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="ml-auto text-on-surface-muted hover:text-on-surface"
+                                  aria-label="View tx"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </div>
+                              <p className="mt-1 whitespace-pre-wrap break-words text-[12.5px] text-on-surface-variant">
+                                {c.body}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </Card>
           </div>
 
           {/* Order panel */}
-          <Card tier="base" padded="md" className="flex flex-col gap-5 h-fit">
-            <Tabs value={side} onValueChange={(v) => setSide(v as "BUY" | "SELL")}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="BUY">Buy</TabsTrigger>
-                <TabsTrigger value="SELL">Sell</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="BUY" className="mt-5 flex flex-col gap-4">
-                <OrderInput
-                  side="BUY"
-                  ticker={ticker}
-                  amount={amount}
-                  setAmount={setAmount}
-                  walletBalance={wallet.data ?? 0n}
-                  holding={holding.data ?? 0n}
-                />
-              </TabsContent>
-              <TabsContent value="SELL" className="mt-5 flex flex-col gap-4">
-                <OrderInput
-                  side="SELL"
-                  ticker={ticker}
-                  amount={amount}
-                  setAmount={setAmount}
-                  walletBalance={wallet.data ?? 0n}
-                  holding={holding.data ?? 0n}
-                />
-              </TabsContent>
-            </Tabs>
-
-            {/* Slippage */}
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                slippage tolerance
-              </span>
-              <div className="flex gap-1">
-                {SLIPPAGE_OPTIONS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setSlippage(s)}
-                    className={cn(
-                      "rounded-lg px-2.5 py-1 font-mono text-[0.62rem]",
-                      slippage === s
-                        ? "bg-primary text-primary-on"
-                        : "bg-white/[0.04] text-on-surface-variant hover:text-on-surface",
-                    )}
-                  >
-                    {s}%
-                  </button>
-                ))}
-              </div>
+          <Card padded="md" className="sticky top-3 flex h-fit flex-col gap-4">
+            <div className="grid grid-cols-2 gap-0.5 rounded-lg bg-[#0F0F11] p-0.5 ghost-border">
+              {(["BUY", "SELL"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSide(s)}
+                  className={cn(
+                    "h-8 rounded-md text-[12.5px] font-semibold uppercase tracking-[0.04em] transition-colors",
+                    side === s
+                      ? s === "BUY"
+                        ? "bg-secondary text-white"
+                        : "bg-error text-white"
+                      : "text-on-surface-muted hover:text-on-surface",
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
 
-            {/* Receipt */}
-            <div className="flex flex-col gap-2 rounded-2xl bg-white/[0.03] px-3 py-3 text-body-sm">
-              <div className="flex items-baseline justify-between">
-                <span className="text-on-surface-muted">Spot price</span>
-                <span className="font-mono text-on-surface">
-                  {formatMin(pool.data.spotPrice, 6)} MIN
-                </span>
+            <div className="flex flex-col gap-3">
+              <OrderInput
+                side={side}
+                ticker={ticker}
+                amount={amount}
+                setAmount={setAmount}
+                walletBalance={wallet.data ?? 0n}
+                holding={holding.data ?? 0n}
+              />
+
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-medium text-on-surface-variant">Slippage</label>
+                <div className="flex gap-1">
+                  {SLIPPAGE_OPTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSlippage(s)}
+                      className={cn(
+                        "h-6 rounded-md px-2 font-mono text-[10.5px]",
+                        slippage === s
+                          ? "bg-white/[0.08] text-on-surface ghost-border"
+                          : "text-on-surface-muted hover:text-on-surface",
+                      )}
+                    >
+                      {s}%
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-on-surface-muted">Expected {side === "BUY" ? "tokens" : "MIN"}</span>
-                <span className="font-mono text-editorial-ink">
-                  {side === "BUY"
-                    ? Number(expectedOut).toLocaleString()
-                    : formatMin(expectedOut, 4)}
-                </span>
+
+              <div className="flex flex-col gap-2 rounded-lg bg-[#0A0A0C] p-3 text-[12px] ghost-border">
+                <div className="flex justify-between">
+                  <span className="text-on-surface-muted">Spot price</span>
+                  <span className="font-mono tabular-nums text-on-surface">
+                    {formatMin(pool.data.spotPrice, 6)} MIN
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-on-surface-muted">
+                    Expected {side === "BUY" ? "tokens" : "MIN"}
+                  </span>
+                  <span className="font-mono tabular-nums text-on-surface">
+                    {side === "BUY"
+                      ? Number(expectedOut).toLocaleString()
+                      : formatMin(expectedOut, 4)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-on-surface-muted">Min received</span>
+                  <span className="font-mono tabular-nums text-on-surface-variant">
+                    {side === "BUY" ? Number(minOut).toLocaleString() : formatMin(minOut, 4)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-on-surface-muted">Fee (0.5%)</span>
+                  <span className="font-mono tabular-nums text-on-surface-variant">
+                    retained to appchain
+                  </span>
+                </div>
               </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-on-surface-muted">Min received ({slippage}%)</span>
-                <span className="font-mono text-on-surface">
-                  {side === "BUY"
-                    ? Number(minOut).toLocaleString()
-                    : formatMin(minOut, 4)}
+
+              {isConnected ? (
+                <Button
+                  variant={side === "BUY" ? "secondary" : "danger"}
+                  size="lg"
+                  fullWidth
+                  disabled={amountMicro === 0n || isTrading || pool.data.graduated}
+                  leading={
+                    isTrading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Zap className="h-3.5 w-3.5" />
+                    )
+                  }
+                  onClick={onSubmit}
+                >
+                  {pool.data.graduated
+                    ? "Graduated · trade on InitiaDEX"
+                    : isTrading
+                      ? "Broadcasting…"
+                      : `${side === "BUY" ? "Buy" : "Sell"} $${ticker}`}
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  leading={<Wallet className="h-3.5 w-3.5" />}
+                  onClick={openConnect}
+                >
+                  Connect wallet
+                </Button>
+              )}
+
+              {isConnected && (wallet.data ?? 0n) === 0n && (
+                <button
+                  type="button"
+                  onClick={() => drip().then(() => wallet.refetch())}
+                  disabled={isDripping}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md bg-[#10B981]/10 py-2 font-mono text-[11px] text-[#34D399] transition-colors hover:bg-[#10B981]/15 disabled:opacity-50"
+                >
+                  {isDripping ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                  {isDripping ? "Dripping…" : "Get 10 MIN from faucet"}
+                </button>
+              )}
+
+              <div className="flex items-center justify-center gap-1.5 text-[10.5px] text-[#52525B]">
+                <Zap className="h-3 w-3 text-secondary" />
+                <span className="font-mono">
+                  Auto-signed · {APPCHAIN.chainId}
                 </span>
-              </div>
-              <div className="flex items-baseline justify-between border-t border-editorial/15 pt-2">
-                <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-                  fee · 0.5%
-                </span>
-                <span className="font-mono text-on-surface-variant">retained to appchain</span>
               </div>
             </div>
-
-            {/* CTA */}
-            {isConnected ? (
-              <Button
-                variant={side === "BUY" ? "hyperglow" : "danger"}
-                size="lg"
-                fullWidth
-                disabled={amountMicro === 0n || isTrading || pool.data.graduated}
-                leading={isTrading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-                onClick={onSubmit}
-              >
-                {pool.data.graduated
-                  ? "Graduated · trade on InitiaDEX"
-                  : isTrading
-                    ? "Broadcasting…"
-                    : `${side === "BUY" ? "Buy" : "Sell"} $${ticker}`}
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                leading={<Wallet className="h-4 w-4" />}
-                onClick={openConnect}
-              >
-                Connect wallet
-              </Button>
-            )}
-
-            {isConnected && (wallet.data ?? 0n) === 0n && (
-              <button
-                type="button"
-                onClick={() => drip().then(() => wallet.refetch())}
-                disabled={isDripping}
-                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-secondary-container/70 py-2 font-mono text-[0.62rem] uppercase tracking-[0.2em] text-secondary hover:bg-secondary-container snappy disabled:opacity-50"
-              >
-                {isDripping ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                {isDripping ? "Dripping…" : "Get 10 MIN from faucet"}
-              </button>
-            )}
-
-            <span className="text-center font-mono text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-muted">
-              all values are real, on-chain · {APPCHAIN.chainId}
-            </span>
           </Card>
         </section>
       )}
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  unit,
-  accent,
-}: {
-  label: string;
-  value: string;
-  unit?: string;
-  accent?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5 border-l border-editorial/20 pl-4">
-      <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-        {label}
-      </span>
-      <span className="flex items-baseline gap-2">
-        <span className={cn("font-editorial text-[1.6rem] leading-none", accent ?? "text-editorial-ink")}>
-          {value}
-        </span>
-        {unit && (
-          <span className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-on-surface-muted">
-            {unit}
-          </span>
-        )}
-      </span>
     </div>
   );
 }
@@ -848,36 +754,37 @@ function OrderInput({
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-3">
-        <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-          amount ({unit})
-        </span>
-        <span className="font-mono text-[0.62rem] uppercase tracking-[0.22em] text-on-surface-muted">
-          balance {balanceLabel}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-[11px] font-medium text-on-surface-variant">
+          Amount ({unit})
+        </label>
+        <span className="font-mono text-[11px] text-on-surface-muted">
+          Bal: <span className="text-on-surface-variant">{balanceLabel}</span>
         </span>
       </div>
-      <div className="rounded-2xl bg-white/[0.04] px-3 py-3 ghost-border flex items-center gap-2">
+      <div className="flex items-center gap-2 rounded-lg bg-[#0F0F11] px-3 py-2.5 ghost-border focus-within:ring-1 focus-within:ring-primary/50">
         <input
           type="number"
           inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="flex-1 bg-transparent font-mono text-title-lg text-on-surface outline-none placeholder:text-on-surface-muted min-w-0"
+          className="min-w-0 flex-1 bg-transparent font-mono text-[15px] tabular-nums text-on-surface outline-none"
           placeholder="0.00"
         />
-        <div className="flex gap-1 shrink-0">
-          {[25, 50, 100].map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPercent(p)}
-              className="rounded-lg bg-white/[0.04] px-2 py-1 font-mono text-[0.58rem] uppercase tracking-[0.2em] text-on-surface-variant hover:text-editorial-ink snappy"
-            >
-              {p === 100 ? "MAX" : `${p}%`}
-            </button>
-          ))}
-        </div>
+        <span className="font-mono text-[11px] text-on-surface-muted">{unit}</span>
+      </div>
+      <div className="grid grid-cols-4 gap-1">
+        {[25, 50, 75, 100].map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => setPercent(p)}
+            className="h-7 rounded-md bg-[#0F0F11] font-mono text-[10.5px] text-on-surface-variant ghost-border hover:bg-white/[0.04] hover:text-on-surface"
+          >
+            {p === 100 ? "MAX" : `${p}%`}
+          </button>
+        ))}
       </div>
     </div>
   );

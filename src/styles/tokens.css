@@ -1,76 +1,76 @@
 /* =========================================================================
- * Professional Institutional UI — Design Tokens
+ * Minitia.fun — Clean design tokens (zinc-dark, institutional)
  * ========================================================================= */
 
 :root {
-  /* ---- Surface (Slate/Navy hierarchy) ---- */
-  --surface: #06111D;
-  --surface-dim: #03080F;
-  --surface-bright: #0B1727;
-  --surface-container-lowest: #07111D;
-  --surface-container-low: #0D1828;
-  --surface-container: #132338;
-  --surface-container-high: #1B2F49;
-  --surface-container-highest: #233A58;
+  /* ---- Surface (zinc hierarchy) ---- */
+  --surface: #0A0A0C;
+  --surface-dim: #050507;
+  --surface-bright: #18181B;
+  --surface-container-lowest: #09090B;
+  --surface-container-low: #111113;
+  --surface-container: #17171A;
+  --surface-container-high: #1E1E22;
+  --surface-container-highest: #27272A;
 
   /* ---- Primary (Institutional Blue) ---- */
-  --primary: #5B8CFF;
-  --primary-dim: #4374E4;
-  --primary-container: #132B57;
+  --primary: #2563EB;
+  --primary-dim: #1D4ED8;
+  --primary-container: #1E3A8A;
   --on-primary: #FFFFFF;
-  --on-primary-container: #DBE6FF;
+  --on-primary-container: #DBEAFE;
 
   /* ---- Secondary (Trusted Emerald) ---- */
-  --secondary: #2FC5A4;
-  --secondary-dim: #19A78A;
-  --secondary-container: #103D38;
+  --secondary: #10B981;
+  --secondary-dim: #059669;
+  --secondary-container: #064E3B;
   --on-secondary: #FFFFFF;
-  --on-secondary-container: #D8FFF4;
+  --on-secondary-container: #D1FAE5;
 
-  /* ---- Tertiary (Subdued Slate Accent) ---- */
-  --tertiary: #8CA4C5;
-  --tertiary-dim: #6F87A8;
-  --tertiary-container: #24354C;
-  --on-tertiary: #F7FBFF;
-  --on-tertiary-container: #E0EBF7;
+  /* ---- Tertiary (Subdued Slate) ---- */
+  --tertiary: #64748B;
+  --tertiary-dim: #475569;
+  --tertiary-container: #1E293B;
+  --on-tertiary: #FFFFFF;
+  --on-tertiary-container: #E2E8F0;
 
   /* ---- Error (Rose) ---- */
-  --error: #FF6B7A;
-  --error-container: #4A1621;
+  --error: #E11D48;
+  --error-container: #4C0519;
   --on-error: #FFFFFF;
-  --on-error-container: #FFDDE2;
+  --on-error-container: #FFE4E6;
 
-  /* ---- Editorial (Slate Blue info/warning) ---- */
-  --editorial: #99B6FF;
-  --editorial-dim: #6F91FF;
-  --editorial-container: #1C335C;
-  --editorial-ink: #F5F7FB;
+  /* ---- Editorial (blue info accent) ---- */
+  --editorial: #3B82F6;
+  --editorial-dim: #2563EB;
+  --editorial-container: #1E3A8A;
+  --editorial-ink: #F1F5F9;
 
   /* ---- On-surface text ---- */
-  --on-surface: #F4F7FB;
-  --on-surface-variant: #A8B7CB;
-  --on-surface-muted: #6F8098;
+  --on-surface: #FAFAFA;
+  --on-surface-variant: #A1A1AA;
+  --on-surface-muted: #71717A;
 
-  /* ---- Outline (for crisp borders) ---- */
-  --outline: #283952;
-  --outline-variant: #18263A;
+  /* ---- Outline ---- */
+  --outline: #3F3F46;
+  --outline-variant: #27272A;
 
   /* ---- Signature gradients ---- */
-  --gradient-primary: linear-gradient(135deg, #78A8FF 0%, var(--primary-dim) 100%);
-  --gradient-hyperglow: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--primary-dim) 100%);
+  --gradient-hyperglow: linear-gradient(45deg, var(--primary) 0%, var(--secondary) 100%);
   --gradient-sovereign: linear-gradient(
     135deg,
-    #9CB9FF 0%,
-    #6F87A8 48%,
+    var(--primary) 0%,
+    var(--tertiary) 50%,
     var(--secondary) 100%
   );
 
-  /* ---- Elevation (ambient shadows) ---- */
-  --shadow-ambient: 0 20px 48px rgba(3, 8, 18, 0.34);
-  --shadow-ambient-lg: 0 28px 80px rgba(3, 8, 18, 0.46);
-  --shadow-glow-primary: 0 10px 26px rgba(91, 140, 255, 0.2);
-  --shadow-glow-secondary: 0 10px 26px rgba(47, 197, 164, 0.18);
-  --shadow-glow-tertiary: 0 10px 26px rgba(140, 164, 197, 0.14);
+  /* ---- Elevation ---- */
+  --shadow-ambient: 0 10px 24px rgba(0, 0, 0, 0.25);
+  --shadow-ambient-lg: 0 20px 48px rgba(0, 0, 0, 0.40);
+  --shadow-glow-primary: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-glow-secondary: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-glow-tertiary: 0 4px 12px rgba(0, 0, 0, 0.15);
 
   /* ---- Motion ---- */
   --ease-snappy: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -78,11 +78,9 @@
   --duration-base: 200ms;
   --duration-slow: 400ms;
 
-  /* ---- Ghost borders (inset hairlines — signature look) ---- */
-  --ghost-border: inset 0 0 0 1px rgb(255 255 255 / 0.08),
-    inset 0 1px 0 rgb(255 255 255 / 0.03);
-  --ghost-border-strong: inset 0 0 0 1px rgb(255 255 255 / 0.12),
-    inset 0 1px 0 rgb(255 255 255 / 0.04);
+  /* ---- Ghost borders (inset hairlines) ---- */
+  --ghost-border: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+  --ghost-border-strong: inset 0 0 0 1px rgb(255 255 255 / 0.10);
 
   /* ---- Radii ---- */
   --radius-sm: 0.125rem;
@@ -91,17 +89,17 @@
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
-  --radius-card: 1.25rem;
-  --radius-hero: 28px;
+  --radius-card: 0.75rem;
+  --radius-hero: 0.75rem;
 
   /* ---- Type families ---- */
-  --font-editorial: "Instrument Serif", "Iowan Old Style", Georgia, serif;
-  --font-display: "Bricolage Grotesque", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-editorial: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* ---- Avatar conic "moonlight" gradients (reserved for token avatars) ---- */
-  --avatar-conic-1: conic-gradient(from 120deg, #A9BEFF, #4F82E8, #2FC5A4, #A9BEFF);
-  --avatar-conic-2: conic-gradient(from 0deg, #C9D5FF, #6C87BA, #143458, #C9D5FF);
-  --avatar-conic-3: conic-gradient(from 240deg, #2FC5A4, #89AFFF, #5A7DD8, #2FC5A4);
+  /* ---- Avatar monogram swatches (retained for compatibility) ---- */
+  --avatar-conic-1: linear-gradient(135deg, #1E3A8A, #064E3B);
+  --avatar-conic-2: linear-gradient(135deg, #1E293B, #3F3F46);
+  --avatar-conic-3: linear-gradient(135deg, #4C1D95, #3F1D38);
 }

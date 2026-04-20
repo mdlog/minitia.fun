@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:explorer": "vite --config vite.explorer.config.ts",
     "build": "tsc -b && vite build",
+    "build:explorer": "tsc -b && vite build --config vite.explorer.config.ts && mv dist-explorer/explorer.html dist-explorer/index.html",
     "preview": "vite preview",
+    "preview:explorer": "vite preview --config vite.explorer.config.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

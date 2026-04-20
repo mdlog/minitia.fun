@@ -214,23 +214,39 @@ function readLiveSummary(ticker) {
   }
 }
 
-function recordRollup(ticker, rollupRpc, firstBlockTx) {
-  const chain_id = tickerToChainId(ticker);
-  // execute-json expects a JSON array of Move arg values. Signature:
-  //   record_rollup(sender, registry_addr: address, ticker: String,
-  //                 rollup_chain_id: String, rollup_rpc: String,
-  //                 first_block_tx: String)
-  // sender is supplied implicitly via --from, so args starts at registry_addr.
-  const args = JSON.stringify([
-    DEPLOYED_ADDRESS,
-    ticker.toUpperCase(),
-    chain_id,
-    rollupRpc,
-    firstBlockTx,
-  ]);
-  log(`[record] calling liquidity_migrator::record_rollup for $${ticker}`);
-  log(`  chain_id=${chain_id}  rollup_rpc=${rollupRpc}`);
+async function waitTxIncluded(txHash, attempts = 6) {
   const env = { ...process.env, LD_LIBRARY_PATH: MINITIAD_LIB };
+  for (let i = 0; i < attempts; i++) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const r = spawnSync(
+      MINITIAD_BIN,
+      [
+        "query",
+        "tx",
+        txHash,
+        "--node",
+        APPCHAIN_RPC.replace(/^http:/, "tcp:"),
+        "--home",
+        join(homedir(), ".minitia"),
+        "--output",
+        "json",
+      ],
+      { env, encoding: "utf8" },
+    );
+    if (r.status !== 0) continue;
+    try {
+      const d = JSON.parse(r.stdout);
+      return { code: Number(d.code ?? 1), rawLog: d.raw_log ?? "", height: Number(d.height ?? 0) };
+    } catch {
+      /* retry */
+    }
+  }
+  return null;
+}
+
+async function callLiquidityMigratorEntry(fnName, argsArr) {
+  const env = { ...process.env, LD_LIBRARY_PATH: MINITIAD_LIB };
+  const args = JSON.stringify(argsArr);
   const r = spawnSync(
     MINITIAD_BIN,
     [
@@ -239,7 +255,7 @@ function recordRollup(ticker, rollupRpc, firstBlockTx) {
       "execute-json",
       DEPLOYED_ADDRESS,
       "liquidity_migrator",
-      "record_rollup",
+      fnName,
       "--args",
       args,
       "--from",
@@ -259,11 +275,62 @@ function recordRollup(ticker, rollupRpc, firstBlockTx) {
     { env, encoding: "utf8" },
   );
   if (r.status !== 0) {
-    log("  record_rollup failed:", r.stdout?.slice(0, 400), r.stderr?.slice(0, 400));
-    return false;
+    log(`  ${fnName} broadcast failed:`, r.stdout?.slice(0, 400), r.stderr?.slice(0, 400));
+    return { ok: false, reason: "broadcast" };
   }
   const match = r.stdout.match(/txhash: ([A-F0-9]+)/);
-  if (match) log(`  record tx broadcast: ${match[1]}`);
+  if (!match) {
+    log(`  ${fnName}: could not parse txhash from stdout`);
+    return { ok: false, reason: "parse" };
+  }
+  const hash = match[1];
+  log(`  ${fnName} tx broadcast: ${hash} — waiting for inclusion…`);
+  const result = await waitTxIncluded(hash);
+  if (!result) {
+    log(`  ${fnName} tx ${hash}: not seen in chain after retries — check manually`);
+    return { ok: false, reason: "timeout", hash };
+  }
+  if (result.code !== 0) {
+    log(`  ${fnName} tx ${hash} FAILED — code=${result.code} log=${result.rawLog.slice(0, 300)}`);
+    return { ok: false, reason: "abort", hash, code: result.code, rawLog: result.rawLog };
+  }
+  log(`  ${fnName} tx ${hash} succeeded at height ${result.height}`);
+  return { ok: true, hash, height: result.height };
+}
+
+async function recordRollup(ticker, rollupRpc, firstBlockTx) {
+  const chain_id = tickerToChainId(ticker);
+  log(`[record] calling liquidity_migrator::record_rollup for $${ticker}`);
+  log(`  chain_id=${chain_id}  rollup_rpc=${rollupRpc}`);
+  const result = await callLiquidityMigratorEntry("record_rollup", [
+    DEPLOYED_ADDRESS,
+    ticker.toUpperCase(),
+    chain_id,
+    rollupRpc,
+    firstBlockTx,
+  ]);
+  if (!result.ok) {
+    // Common post-retry case: stage already marked live from a prior
+    // attempt with a different (wrong) RPC. Fall back to admin_update
+    // which lets the module admin overwrite the coords in-place.
+    const alreadyLive = result.code === 196615; // invalid_state + E_ALREADY_LIVE
+    if (alreadyLive) {
+      log(`  stage already live — falling back to admin_update_rollup`);
+      const fix = await callLiquidityMigratorEntry("admin_update_rollup", [
+        DEPLOYED_ADDRESS,
+        ticker.toUpperCase(),
+        chain_id,
+        rollupRpc,
+        firstBlockTx,
+      ]);
+      if (!fix.ok) {
+        log(`  admin_update_rollup also failed; will retry next poll`);
+        return false;
+      }
+    } else {
+      return false;
+    }
+  }
   const state = loadState();
   state.live[ticker.toUpperCase()] = {
     chain_id,
@@ -320,7 +387,7 @@ async function handleStaged(ev, state) {
   }
   log(`  spawn ok — rpc=${summary.rpc} first_block_tx=${summary.first_block_tx}`);
 
-  const ok = recordRollup(ev.ticker, summary.rpc, summary.first_block_tx || "genesis");
+  const ok = await recordRollup(ev.ticker, summary.rpc, summary.first_block_tx || "genesis");
   if (!ok) {
     log(`  record_rollup broadcast failed for ${ev.ticker}; leaving in staged state`);
   }
@@ -346,13 +413,48 @@ async function watchLoop() {
 
 // ---- CLI -------------------------------------------------------------------
 
+async function fixCli(ticker, rpc, firstBlockTx) {
+  const chain_id = tickerToChainId(ticker);
+  log(`[fix] admin_update_rollup for $${ticker}`);
+  log(`  chain_id=${chain_id}  rollup_rpc=${rpc}`);
+  const result = await callLiquidityMigratorEntry("admin_update_rollup", [
+    DEPLOYED_ADDRESS,
+    ticker.toUpperCase(),
+    chain_id,
+    rpc,
+    firstBlockTx || "genesis",
+  ]);
+  if (result.ok) {
+    const state = loadState();
+    state.live[ticker.toUpperCase()] = {
+      chain_id,
+      rollupRpc: rpc,
+      firstBlockTx: firstBlockTx || "genesis",
+      recordedAt: Date.now(),
+    };
+    delete state.staged[ticker.toUpperCase()];
+    saveState(state);
+  }
+}
+
 if (process.argv[2] === "record") {
   const [, , , ticker, rpc, firstBlockTx] = process.argv;
   if (!ticker || !rpc) {
     console.error("usage: promoter.mjs record TICKER ROLLUP_RPC [FIRST_BLOCK_TX]");
     process.exit(1);
   }
-  recordRollup(ticker, rpc, firstBlockTx || "genesis");
+  await recordRollup(ticker, rpc, firstBlockTx || "genesis");
+} else if (process.argv[2] === "fix") {
+  const [, , , ticker, rpc, firstBlockTx] = process.argv;
+  if (!ticker || !rpc) {
+    console.error(
+      "usage: promoter.mjs fix TICKER ROLLUP_RPC [FIRST_BLOCK_TX]\n" +
+        "  Admin-only: overwrite coords on an already-live stage. Requires\n" +
+        "  liquidity_migrator::admin_update_rollup entry (post-v2 upgrade).",
+    );
+    process.exit(1);
+  }
+  await fixCli(ticker, rpc, firstBlockTx);
 } else {
   watchLoop();
 }

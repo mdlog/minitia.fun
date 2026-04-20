@@ -169,6 +169,40 @@ module minitia_fun::liquidity_migrator {
         });
     }
 
+    /// Ops-recovery path: module admin overwrites the rollup coordinates
+    /// on an already-live stage. Use case: the initial record_rollup went
+    /// in with a stale RPC URL (e.g. operator pasted the parent-chain URL
+    /// by accident) and the regular record_rollup aborts with
+    /// E_ALREADY_LIVE on retry. Admin-only. Does NOT reset status; the
+    /// stage stays `live`.
+    public entry fun admin_update_rollup(
+        admin: &signer,
+        registry_addr: address,
+        ticker: String,
+        rollup_chain_id: String,
+        rollup_rpc: String,
+        first_block_tx: String,
+    ) acquires Registry {
+        let registry = borrow_global_mut<Registry>(registry_addr);
+        assert!(
+            signer::address_of(admin) == registry.admin,
+            error::permission_denied(E_NOT_ADMIN)
+        );
+        assert!(table::contains(&registry.stages, ticker), error::not_found(E_NOT_STAGED));
+
+        let stage = table::borrow_mut(&mut registry.stages, ticker);
+        stage.rollup_chain_id = rollup_chain_id;
+        stage.rollup_rpc = rollup_rpc;
+        stage.first_block_tx = first_block_tx;
+
+        event::emit(RollupRegistered {
+            ticker,
+            rollup_chain_id,
+            rollup_rpc,
+            first_block_tx,
+        });
+    }
+
     // ---- View --------------------------------------------------------------
 
     #[view]

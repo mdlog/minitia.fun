@@ -115,6 +115,83 @@ Only the machine that holds the rollup's `gas-station` keyring can run the fauce
 
 ---
 
+## Who's building this & why
+
+<!--
+  TODO for submitter: replace this block with a short (3-5 sentence) bio
+  covering:
+    - name + crypto / product background
+    - how you found Initia and what clicked
+    - why THIS problem (appchain launcher) and why YOU can ship it
+    - post-hackathon commitment level (full-time / part-time / weekend)
+  Judges reading for the "strongest founder potential" Network School
+  trip check this section first. Keep it specific; avoid generic "crypto
+  native since 2019" filler.
+-->
+
+_Founder bio to be filled in by submitter before final submission._
+
+---
+
+## Post-hackathon milestone roadmap
+
+The INITIATE reward structure gates most of the prize pool on milestones hit **after** placement is announced. Below is the commitment plan the team will run against, mapped to each gate.
+
+### Gate 1 · Public mainnet launch (T+30 days) · $1,200-1,500
+
+**Definition of done**: all 4 Move modules deployed to `initia-1` (Initia mainnet), publicly addressable via tunneled RPC + REST, Launchpad + Trade + Graduation flows all hitting the mainnet deployment.
+
+| Milestone | ETA | Blocker / cost |
+|---|---|---|
+| Fund mainnet admin wallet | T+3d | Needs mainnet INIT (~$50-100 for deploy + init gas) |
+| Publish `token_factory`, `bonding_curve`, `comments`, `liquidity_migrator` on mainnet | T+7d | `minitiad tx move publish` × 4 |
+| Initialize Registry + Wall + Vault + MigratorRegistry | T+7d | 4 entry-fn tx |
+| Tunnel RPC + REST with a sticky domain (not cloudflared ephemeral) | T+14d | DNS + reverse-proxy setup |
+| Repoint `VITE_APPCHAIN_*` in Vercel to mainnet endpoints | T+14d | Vercel env vars swap |
+| Verify: 1 test-token launched + 1 trade round-trip on mainnet | T+21d | Smoke test |
+| Snapshot the tx hashes, update [`.initia/PROOF-MAINNET.md`](./.initia/) | T+28d | Audit trail |
+
+### Gate 2 · Adoption — 500 active wallets OR $10k TVL (T+90 days) · $2,500
+
+**Definition of done**: at least ONE of the thresholds cleared, verifiable from on-chain data.
+
+- **500 active wallets** = unique `sender` addresses broadcasting `MsgExecuteJSON` against our modules within a 30-day window.
+- **$10k TVL** = total umin held in `bonding_curve` vault (Phase 2 real custody) plus `liquidity_migrator` stages, converted to USD at the day's INIT/USD rate.
+
+**Go-to-market**:
+| Lever | Commitment |
+|---|---|
+| X / Twitter thread series | 2 per week post-launch — launch flywheel, graduation case studies, creator-fee highlights |
+| Telegram alpha channel seeding | Post new-token firehose to 5-10 memecoin alpha groups in the first 2 weeks |
+| Creator onboarding | Partner with 3-5 memecoin community leaders to co-launch their token on mainnet as anchor cases |
+| Interwoven Bridge campaign | Cross-chain deposits (Ethereum / Solana / Base → Initia) as onboarding funnel |
+| Referral / fee share | Route a slice of creator fees to referrers via on-chain memo tracking |
+
+### Stretch · $100k TVL OR 1M txs (T+180 days) · $6,600
+
+**Definition of done**: cleared EITHER threshold on mainnet before any other eligible team.
+
+| Lever | Commitment |
+|---|---|
+| Graduated chain ecosystem | Real `spawn-local` → OPinit-bridged rollups (Phase A.5+ scope), not hackathon demo |
+| InitiaDEX pool auto-seed | Graduated tokens get automatic liquidity pool on L1 InitiaDEX for secondary market |
+| Paid user acquisition | $5k-10k marketing budget contingent on Gate 1 + 2 hit, targeting CT memecoin crowd |
+| SDK / CLI | `npm i @minitia-fun/sdk` for trivial third-party integration (bots, indexers, bundlers) |
+
+### Why these numbers are realistic
+
+- Bonding curves are **highly capital-efficient** for TVL formation on memecoin flywheels. Pump.fun hit $100M+ TVL during peak cycles; 0.1% of that feels conservative on Initia given the novelty.
+- 500 wallets is ~15 new wallets/day over 30 days. For context, a single viral X launch has historically driven 1000+ unique buyers in hours.
+- Mainnet launch in 30 days is doable: most infra is already proven on `minitia-fun-test-1`; mainnet is mostly redeploy + DNS config, not fresh implementation.
+
+### Hard blockers we're honest about
+
+- OPinit bridge to `initiation-1` mainnet: needs Initia team coordination + real L1 INIT deposit (~$500+) for bridge deploy. If Initia doesn't whitelist us or costs run high, Gate 1 scope might need to shift to "sovereign spawn live, no L1 bridge" as the MVP.
+- Regulatory: a US-fronted memecoin launcher is a compliance minefield. We'll likely geofence or run behind a non-US entity from day one.
+- Indexer: RPC `tx_search` does not scale past a few thousand txs. Running a dedicated Initia indexer is on Gate 2 critical path.
+
+---
+
 ## 1. The Pitch
 
 Minitia.fun is a **fair-launch appchain launcher** built on the Initia stack. Anyone can mint a token in seconds, trade it on a 100 ms-block bonding curve, graduate the liquidity to **InitiaDEX** at a target market cap, and then promote the community into its own **sovereign L2 rollup** — all from a single cockpit.

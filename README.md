@@ -24,7 +24,14 @@ Minitia.fun is a fair-launch appchain launcher on Initia where anyone mints a to
 
   The React 19 + Vite frontend wraps all four modules: Launchpad bundles `token_factory::launch + bonding_curve::create_pool` in one tx, Trade page mirrors the integral math so UI estimate matches on-chain settlement to within 1 unit, Graduation page is a real 4-state machine reading `pool_state` + `stage_of` every 10 s.
 
-- **The Native Feature**: **Auto-signing (Session UX)** is the load-bearing feature. `InterwovenKitProvider` is configured with `enableAutoSign: { [chainId]: ["/initia.move.v1.MsgExecute"] }` in [`src/providers/Web3Providers.tsx`](src/providers/Web3Providers.tsx). After the first connection, every Buy / Sell on the Trade page executes under 1 s with **zero wallet popups** — the only way a fair-launch UX can feel like Web2. The Interwoven Bridge (`openBridge()`) and .init Usernames (`ticker.fun.init`) are also wired end-to-end for the full "Gaib" demo.
+- **The Native Feature**: **Auto-signing (Session UX via Cosmos SDK authz).** `InterwovenKitProvider` is configured with `enableAutoSign: { [chainId]: ["/initia.move.v1.MsgExecuteJSON", "/initia.move.v1.MsgExecute"] }` in [`src/providers/Web3Providers.tsx`](src/providers/Web3Providers.tsx). The top-bar [`AutoSignIndicator`](src/components/layout/AutoSignIndicator.tsx) is a real toggle: one click triggers ONE `MsgGrant` signature in the user's wallet (MetaMask / Keplr / Leap / Privy all work — InterwovenKit implements this as an authz grant, not a wallet-specific session primitive), after which every Buy / Sell / Claim / Stage / Record executes under 1 s with **zero popups**. The Interwoven Bridge (`openBridge()`) and `.init` Usernames (`ticker.fun.init`) are also wired end-to-end.
+
+### How to Run Locally
+
+1. `npm install` — installs React 19 + Vite + InterwovenKit + wagmi + viem + TanStack Query.
+2. `cp .env.example .env.local` and point `VITE_APPCHAIN_RPC` / `VITE_APPCHAIN_REST` at the live tunnel (`https://evonft.xyz` / `https://nectiq.xyz`) or leave blank to skip rollup reads.
+3. `npm run dev` — dev server at `http://localhost:5173`. Grab testnet INIT from [`faucet.testnet.initia.xyz`](https://faucet.testnet.initia.xyz) if the wallet is empty.
+4. Connect via MetaMask / Keplr / Leap / Privy, click **"Enable auto-sign"** in the top bar (one popup, then silence), then launch a token at `/launchpad` or buy `$MOVE` at `/trade/MOVE`. Every action hits the live `minitia-fun-test-1` Move rollup.
 
 ### Why Move for a DeFi track
 
@@ -36,13 +43,6 @@ Initia's track guide hints DeFi → EVM, but we deliberately chose Move-VM becau
 4. **Compatible upgrades.** `COMPATIBLE` upgrade policy lets us iterate the bonding curve (we shipped 4 versions during the hackathon) without breaking existing pool state — the migration story at the Move-VM level.
 
 For a category where users send real MIN into a curve they don't control, Move's "make invalid states unrepresentable" philosophy is the right default.
-
-### How to Run Locally
-
-1. `npm install` — installs React 19 + Vite + InterwovenKit + wagmi + viem + TanStack Query.
-2. `cp .env.example .env.local` (optional; `VITE_INITIA_NETWORK=testnet` is the default).
-3. `npm run dev` — dev server at `http://localhost:5173`. Grab testnet INIT from [`faucet.testnet.initia.xyz`](https://faucet.testnet.initia.xyz) when the in-app banner prompts.
-4. Connect via Keplr / Leap / MetaMask / Privy, then click **Deploy Token** on the Launchpad page or **Buy $MOVE — one-click** on the Trade page to submit a real transaction on `initiation-2`. Tx hash appears as a toast with an explorer link and is persisted in your wallet dropdown's "Recent activity".
 
 ### On-chain proof (deployed and verified)
 

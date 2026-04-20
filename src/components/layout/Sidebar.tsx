@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
-import { Bell, HelpCircle, Search, Settings } from "lucide-react";
+import { HelpCircle, Search, Settings } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { Chip } from "@/components/ui/Chip";
+import { NotificationsMenu } from "./NotificationsMenu";
 import { cn } from "@/lib/cn";
 import { isNavItemActive, primaryNav } from "./navigation";
 
@@ -100,13 +101,7 @@ export function Sidebar({ open = true }: { open?: boolean }) {
           >
             <HelpCircle className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="flex h-8 flex-1 items-center justify-center rounded-md text-on-surface-muted hover:bg-white/[0.04] hover:text-on-surface"
-          >
-            <Bell className="h-3.5 w-3.5" />
-          </button>
+          <NotificationsMenu variant="sidebar" />
         </div>
       </div>
     </aside>

@@ -1,8 +1,9 @@
 import { matchPath, NavLink, useLocation } from "react-router-dom";
-import { Bell, PanelLeftClose, PanelLeftOpen, RefreshCw } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, RefreshCw } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { AutoSignIndicator } from "./AutoSignIndicator";
 import { BridgePill } from "./BridgePill";
+import { NotificationsMenu } from "./NotificationsMenu";
 import { WalletPill } from "./WalletPill";
 import { cn } from "@/lib/cn";
 
@@ -125,14 +126,7 @@ export function TopBar({
         </button>
         <AutoSignIndicator />
         <BridgePill />
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative flex h-8 w-8 items-center justify-center rounded-md text-on-surface-variant hover:bg-white/[0.04] hover:text-on-surface"
-        >
-          <Bell className="h-3.5 w-3.5" />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#3B82F6]" />
-        </button>
+        <NotificationsMenu />
         <WalletPill />
       </div>
     </header>

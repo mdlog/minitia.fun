@@ -211,6 +211,36 @@ minitiad tx move execute <DEPLOYED_ADDR> liquidity_migrator initialize ...
   `tokens_sold / max_supply` percentage.
 - `CurveDepthChart` renders a rose dashed line at the supply cap.
 
+### Compatible upgrade — `claim_reserve` entry (post-v2)
+
+Adds one public entry function + a new event + two error codes to
+`bonding_curve.move`. Compatible upgrade (no struct fields changed):
+
+```bash
+cd contracts
+minitiad move build
+minitiad move deploy \
+  --from gas-station \
+  --chain-id minitia-fun-v2-1 \
+  --keyring-backend test \
+  --home ~/.minitia \
+  --node tcp://localhost:26657 \
+  --upgrade-policy compatible \
+  -y
+```
+
+Surface area:
+- `bonding_curve::claim_reserve(creator, registry_addr, ticker)` — one-shot
+  withdrawal of the entire `pool.init_reserve` to the creator's wallet.
+  Requires `pool.graduated` + `reserve > 0`. Sets `init_reserve = 0`
+  post-transfer; second call aborts with `E_NO_RESERVE = 18`.
+- `bonding_curve::ReserveClaimed` event: `{ticker, creator, amount, final_supply}`.
+- Abort codes added: `E_NOT_GRADUATED = 17`, `E_NO_RESERVE = 18`.
+
+Frontend ([useClaimReserveAction](src/hooks/useClaimReserveAction.ts) +
+Graduation page) gates the button on `pool.graduated && pool.creator ==
+caller && pool.init_reserve > 0` — same invariants the contract enforces.
+
 ### What is NOT migrated
 
 Pools, balances, promotion stages, and claimed-fee state on the old appchain

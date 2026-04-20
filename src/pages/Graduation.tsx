@@ -22,6 +22,7 @@ import { Stat } from "@/components/ui/Stat";
 import { useInitiaAccount } from "@/hooks/useInitiaAccount";
 import { useAllLaunchedTokens, graduationProgress } from "@/hooks/useAllLaunchedTokens";
 import { useClaimFeesAction } from "@/hooks/useClaimFeesAction";
+import { useClaimReserveAction } from "@/hooks/useClaimReserveAction";
 import { useGraduationEvent } from "@/hooks/useGraduationEvent";
 import { useHolderLeaderboard } from "@/hooks/useHolderLeaderboard";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
@@ -74,6 +75,7 @@ export default function Graduation() {
   const tokens = useAllLaunchedTokens(50);
   const poolCreator = usePoolCreator(ticker);
   const { claim, isPending: isClaiming } = useClaimFeesAction();
+  const { claim: claimReserve, isPending: isClaimingReserve } = useClaimReserveAction();
   const promotion = usePromotionStage(ticker);
   const { stage: stagePromotion, isPending: isStaging } = useStagePromotionAction();
   const { record: recordRollup, isPending: isRecording } = useRecordRollupAction();
@@ -278,6 +280,63 @@ export default function Graduation() {
           <span className="font-mono text-[13px] text-on-surface-muted">MIN</span>
         </div>
       </Card>
+
+      {/* Reserve withdrawal (post-graduation, creator only) */}
+      {pool.data?.graduated && (
+        <Card padded="lg">
+          <SectionHeader
+            eyebrow="Creator"
+            title="Pool reserve"
+            description="One-shot withdrawal of the custodied MIN backing. Use this to seed an InitiaDEX pool, fund the sovereign chain treasury, or airdrop to holders on the new chain."
+            action={
+              isCreator ? (
+                <Button
+                  variant="primary"
+                  size="md"
+                  leading={
+                    isClaimingReserve ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Rocket className="h-3.5 w-3.5" />
+                    )
+                  }
+                  disabled={
+                    (pool.data?.initReserve ?? 0n) === 0n || isClaimingReserve
+                  }
+                  onClick={async () => {
+                    const ok = await claimReserve(ticker);
+                    if (ok) setTimeout(() => pool.refetch(), 1500);
+                  }}
+                >
+                  {(pool.data?.initReserve ?? 0n) === 0n
+                    ? "Already claimed"
+                    : isClaimingReserve
+                      ? "Claiming…"
+                      : `Claim ${formatMin(pool.data?.initReserve ?? 0n, 2)} MIN`}
+                </Button>
+              ) : (
+                <span className="text-[11px] font-medium text-on-surface-muted">
+                  only creator can claim
+                </span>
+              )
+            }
+          />
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="font-mono text-[32px] font-medium tabular-nums text-on-surface">
+              {formatMin(pool.data?.initReserve ?? 0n, 4)}
+            </span>
+            <span className="font-mono text-[13px] text-on-surface-muted">MIN</span>
+          </div>
+          {(pool.data?.initReserve ?? 0n) > 0n && (
+            <p className="mt-3 text-[11.5px] leading-[1.55] text-[#FBBF24]">
+              ⚠︎ One-shot and irreversible. Once claimed, the reserve leaves the
+              vault and the remaining ${ticker} balances in this pool lose
+              their on-curve backing. Plan your DEX seed / airdrop destination
+              first.
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Deploy templates */}
       <section className="flex flex-col gap-3">

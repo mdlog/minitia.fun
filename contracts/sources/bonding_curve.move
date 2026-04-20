@@ -2,12 +2,18 @@
 /// ---------------------------------------------------------------------------
 /// Per-token linear bonding curve with per-holder balance tracking AND real
 /// umin custody. Every buy() moves umin from trader -> vault, every sell()
-/// and claim_fees() pays out from vault -> receiver via
-/// primary_fungible_store.
+/// and creator-claim entry (claim_fees / claim_reserve) pays out from
+/// vault -> receiver via primary_fungible_store.
 ///
 /// Vault = named Object owned by the module admin, accessed via a stored
 /// ExtendRef so the module can mint a signer on demand without requiring the
 /// admin to re-sign.
+///
+/// Entry functions for creator capital flow post-graduation:
+///   - claim_fees     : withdraw accumulated 0.5% trading fees (always)
+///   - claim_reserve  : withdraw the ENTIRE locked reserve, one-shot
+///                      (only after graduation; intended for DEX seeding /
+///                      sovereign-chain airdrop / appchain treasury).
 module minitia_fun::bonding_curve {
     use std::error;
     use std::signer;
@@ -47,6 +53,11 @@ module minitia_fun::bonding_curve {
     const E_SUPPLY_CAP: u64 = 15;
     /// Invalid max_supply supplied at create_pool (must be > 0).
     const E_INVALID_SUPPLY: u64 = 16;
+    /// claim_reserve called on a pool that hasn't reached graduation yet.
+    const E_NOT_GRADUATED: u64 = 17;
+    /// claim_reserve called but the reserve vault for this ticker is empty
+    /// (first claim already drained it, or pool graduated with zero reserve).
+    const E_NO_RESERVE: u64 = 18;
 
     // ---- Seeds -------------------------------------------------------------
     const VAULT_SEED: vector<u8> = b"minitia_fun::bonding_curve::vault::v1";
@@ -129,6 +140,14 @@ module minitia_fun::bonding_curve {
         creator: address,
         amount: u128,
         new_reserve: u128,
+    }
+
+    #[event]
+    struct ReserveClaimed has drop, store {
+        ticker: String,
+        creator: address,
+        amount: u128,
+        final_supply: u128,
     }
 
     /// Stored at the admin address. `extend_ref` lets the module mint the
@@ -419,6 +438,66 @@ module minitia_fun::bonding_curve {
             creator: creator_addr,
             amount,
             new_reserve: new_reserve_snapshot,
+        });
+    }
+
+    /// Creator claims the ENTIRE reserve of a graduated pool out of the
+    /// vault, one-shot. Intended for bootstrapping liquidity on the
+    /// creator's destination: seed an InitiaDEX pool, fund the sovereign
+    /// appchain treasury, or airdrop to holders on the new chain.
+    ///
+    /// Guardrails:
+    ///   - Only the pool creator can call.
+    ///   - Pool must be graduated (`pool.graduated == true`). The whole
+    ///     point is that buy/sell are already frozen.
+    ///   - Reserve must be non-zero. Subsequent calls after the first
+    ///     successful claim abort with E_NO_RESERVE (idempotent failure
+    ///     mode -- no double-payout).
+    ///
+    /// Fees (`fee_accumulated`) are untouched; creator still needs to call
+    /// `claim_fees` separately to withdraw accrued trading fees.
+    ///
+    /// Note: this removes the economic backing of outstanding $TICKER
+    /// balances in this pool. Holders' tokens continue to exist as table
+    /// entries but no longer redeemable on this pool. It is the creator's
+    /// responsibility to airdrop / seed a DEX / open a new curve on their
+    /// sovereign chain so holders retain value.
+    public entry fun claim_reserve(
+        creator: &signer,
+        registry_addr: address,
+        ticker: String,
+    ) acquires Registry, CustodyCap {
+        assert!(exists<Registry>(registry_addr), error::not_found(E_NOT_INITIALIZED));
+        assert!(exists<CustodyCap>(registry_addr), error::not_found(E_CUSTODY_NOT_INITIALIZED));
+        let registry = borrow_global_mut<Registry>(registry_addr);
+        assert!(table::contains(&registry.pools, ticker), error::not_found(E_POOL_MISSING));
+        let pool = table::borrow_mut(&mut registry.pools, ticker);
+
+        let creator_addr = signer::address_of(creator);
+        assert!(pool.creator == creator_addr, error::permission_denied(E_NOT_CREATOR));
+        assert!(pool.graduated, error::invalid_state(E_NOT_GRADUATED));
+
+        let amount = pool.init_reserve;
+        assert!(amount > 0, error::invalid_state(E_NO_RESERVE));
+        assert!(amount <= (0xFFFFFFFFFFFFFFFFu128), error::invalid_state(E_AMOUNT_TOO_LARGE));
+
+        pool.init_reserve = 0;
+        let final_supply_snapshot = pool.token_supply;
+
+        let cap = borrow_global<CustodyCap>(registry_addr);
+        let vault_sig = object::generate_signer_for_extending(&cap.extend_ref);
+        primary_fungible_store::transfer(
+            &vault_sig,
+            umin_metadata(),
+            creator_addr,
+            (amount as u64),
+        );
+
+        event::emit(ReserveClaimed {
+            ticker,
+            creator: creator_addr,
+            amount,
+            final_supply: final_supply_snapshot,
         });
     }
 

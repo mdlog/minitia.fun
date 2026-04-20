@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 const Discovery = lazy(() => import("@/pages/Discovery"));
 const Launchpad = lazy(() => import("@/pages/Launchpad"));
 const Trade = lazy(() => import("@/pages/Trade"));
+const TradeRedirect = lazy(() => import("@/pages/TradeRedirect"));
 const Graduation = lazy(() => import("@/pages/Graduation"));
 const Airdrops = lazy(() => import("@/pages/Airdrops"));
 const Explorer = lazy(() => import("@/pages/Explorer"));
@@ -31,9 +32,10 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Discovery />} />
           <Route path="/launchpad" element={<Launchpad />} />
+          <Route path="/trade" element={<TradeRedirect mode="trade" />} />
           <Route path="/trade/:symbol" element={<Trade />} />
+          <Route path="/graduation" element={<TradeRedirect mode="graduation" />} />
           <Route path="/graduation/:symbol" element={<Graduation />} />
-          <Route path="/graduation" element={<Navigate to="/graduation/MOVE" replace />} />
           <Route path="/airdrops" element={<Airdrops />} />
           <Route path="/explorer" element={<Explorer />} />
           <Route path="/tx/:hash" element={<TxDetail />} />

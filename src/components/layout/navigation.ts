@@ -30,7 +30,7 @@ export const primaryNav: NavItem[] = [
     activePrefix: "/launchpad",
   },
   {
-    to: "/trade/MOVE",
+    to: "/trade",
     label: "Trading",
     shortLabel: "Trade",
     description: "Monitor charts, liquidity, and order flow.",
@@ -38,7 +38,7 @@ export const primaryNav: NavItem[] = [
     activePrefix: "/trade",
   },
   {
-    to: "/graduation/MOVE",
+    to: "/graduation",
     label: "Graduation",
     shortLabel: "Graduate",
     description: "Promote breakout communities into their next phase.",

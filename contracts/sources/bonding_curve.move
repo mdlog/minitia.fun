@@ -42,6 +42,11 @@ module minitia_fun::bonding_curve {
     /// ticker. Prevents outside wallets from silently capturing pool-creator
     /// rights (trading fees, appchain promotion).
     const E_NOT_LAUNCHER: u64 = 14;
+    /// Buy would push token_supply past max_supply. Client should quote
+    /// against remaining cap (max_supply - token_supply) and adjust order.
+    const E_SUPPLY_CAP: u64 = 15;
+    /// Invalid max_supply supplied at create_pool (must be > 0).
+    const E_INVALID_SUPPLY: u64 = 16;
 
     // ---- Seeds -------------------------------------------------------------
     const VAULT_SEED: vector<u8> = b"minitia_fun::bonding_curve::vault::v1";
@@ -75,6 +80,11 @@ module minitia_fun::bonding_curve {
         creator: address,
         init_reserve: u128,
         token_supply: u128,
+        /// Hard cap on token_supply. Immutable after create_pool. Any buy
+        /// that would push token_supply past this aborts with E_SUPPLY_CAP,
+        /// and graduation triggers early when token_supply reaches it
+        /// (dual condition with GRADUATION_INIT_RESERVE).
+        max_supply: u128,
         // Linear curve: price(s) = base_price + (s * slope) / SLOPE_DEN
         base_price: u128,
         slope: u128,
@@ -90,6 +100,7 @@ module minitia_fun::bonding_curve {
         creator: address,
         base_price: u128,
         slope: u128,
+        max_supply: u128,
     }
 
     #[event]
@@ -156,24 +167,27 @@ module minitia_fun::bonding_curve {
 
     // ---- Entry: pool lifecycle --------------------------------------------
 
-    /// Create a pool for a ticker. Gated to the token's original launcher so
-    /// trading fees and appchain promotion rights stay with the creator.
-    /// Two invariants enforced:
+    /// Create a pool for a ticker. Gated to the token's original launcher
+    /// and now requires a fixed `max_supply` (hard cap on circulating
+    /// tokens). Three invariants enforced:
     ///   1. Ticker MUST already exist in token_factory::Registry
     ///      (i.e. someone ran token_factory::launch).
     ///   2. Caller MUST be the launcher recorded there.
+    ///   3. max_supply > 0.
     /// Combined with the Launchpad bundling `launch + create_pool` in a
     /// single tx, this guarantees `pool.creator == token_factory.creator`
-    /// for all new pools.
-    /// Default linear params: base=1_000 (0.001 INIT) and slope=10.
+    /// for all new pools and gives every token a stable supply ceiling
+    /// for market-cap accounting and scarcity narrative.
     public entry fun create_pool(
         creator: &signer,
         registry_addr: address,
         ticker: String,
         base_price: u128,
         slope: u128,
+        max_supply: u128,
     ) acquires Registry {
         assert!(exists<Registry>(registry_addr), error::not_found(E_NOT_INITIALIZED));
+        assert!(max_supply > 0, error::invalid_argument(E_INVALID_SUPPLY));
 
         let creator_addr = signer::address_of(creator);
 
@@ -196,6 +210,7 @@ module minitia_fun::bonding_curve {
             creator: creator_addr,
             init_reserve: 0,
             token_supply: 0,
+            max_supply,
             base_price,
             slope,
             fee_accumulated: 0,
@@ -204,7 +219,7 @@ module minitia_fun::bonding_curve {
         };
         table::add(&mut registry.pools, ticker, pool);
 
-        event::emit(PoolCreated { ticker, creator: creator_addr, base_price, slope });
+        event::emit(PoolCreated { ticker, creator: creator_addr, base_price, slope, max_supply });
     }
 
     // ---- Entry: trading ---------------------------------------------------
@@ -244,6 +259,13 @@ module minitia_fun::bonding_curve {
         // slope == 0: degenerate flat curve, x = net*1_000_000/base.
         let tokens_out = tokens_out_for_buy(pool, net);
         assert!(tokens_out >= (min_tokens_out as u128), error::invalid_state(E_SLIPPAGE));
+        // Hard cap on circulating supply. Client should quote against
+        // (max_supply - token_supply) and sized the buy accordingly; when
+        // very close to the cap, this abort tells the client to shrink.
+        assert!(
+            pool.token_supply + tokens_out <= pool.max_supply,
+            error::invalid_state(E_SUPPLY_CAP)
+        );
 
         pool.init_reserve = pool.init_reserve + net;
         pool.token_supply = pool.token_supply + tokens_out;
@@ -273,7 +295,14 @@ module minitia_fun::bonding_curve {
             fee,
         });
 
-        if (pool.init_reserve >= GRADUATION_INIT_RESERVE) {
+        // Dual graduation trigger: reserve threshold OR supply cap reached
+        // (whichever fires first). Cap-hit is a safety net for pools whose
+        // max_supply is tight enough that the curve can never reach the
+        // reserve threshold before selling out.
+        if (
+            pool.init_reserve >= GRADUATION_INIT_RESERVE
+                || pool.token_supply >= pool.max_supply
+        ) {
             pool.graduated = true;
             event::emit(Graduated {
                 ticker,
@@ -401,7 +430,9 @@ module minitia_fun::bonding_curve {
         table::contains(&borrow_global<Registry>(registry_addr).pools, ticker)
     }
 
-    /// Returns (init_reserve, token_supply, base_price, slope, fee_accumulated, trade_count, graduated_as_u64).
+    /// Returns (init_reserve, token_supply, base_price, slope, fee_accumulated,
+    /// trade_count, graduated_as_u64, max_supply). Index 7 is the v2 supply
+    /// cap; older callers reading indices 0..6 are unaffected.
     #[view]
     public fun pool_state(registry_addr: address, ticker: String): vector<u128> acquires Registry {
         let registry = borrow_global<Registry>(registry_addr);
@@ -414,6 +445,7 @@ module minitia_fun::bonding_curve {
         vector::push_back(&mut result, pool.fee_accumulated);
         vector::push_back(&mut result, (pool.trade_count as u128));
         vector::push_back(&mut result, if (pool.graduated) { 1u128 } else { 0u128 });
+        vector::push_back(&mut result, pool.max_supply);
         result
     }
 

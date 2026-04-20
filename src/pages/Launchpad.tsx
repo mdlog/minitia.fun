@@ -28,29 +28,36 @@ import {
   APPCHAIN_RPC_AVAILABLE,
 } from "@/lib/initia";
 
-const DRAFT_KEY = "minitia.launchpad_draft.v1";
+const DRAFT_KEY = "minitia.launchpad_draft.v2";
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const DEFAULT_MAX_SUPPLY = "1000000000";
 
 interface Draft {
   name: string;
   ticker: string;
   desc: string;
   logo: string;
+  maxSupply: string;
 }
 
 function loadDraft(): Draft {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return { name: "", ticker: "", desc: "", logo: "" };
+    if (!raw)
+      return { name: "", ticker: "", desc: "", logo: "", maxSupply: DEFAULT_MAX_SUPPLY };
     const parsed = JSON.parse(raw);
     return {
       name: typeof parsed.name === "string" ? parsed.name : "",
       ticker: typeof parsed.ticker === "string" ? parsed.ticker : "",
       desc: typeof parsed.desc === "string" ? parsed.desc : "",
       logo: typeof parsed.logo === "string" ? parsed.logo : "",
+      maxSupply:
+        typeof parsed.maxSupply === "string" && parsed.maxSupply.length > 0
+          ? parsed.maxSupply
+          : DEFAULT_MAX_SUPPLY,
     };
   } catch {
-    return { name: "", ticker: "", desc: "", logo: "" };
+    return { name: "", ticker: "", desc: "", logo: "", maxSupply: DEFAULT_MAX_SUPPLY };
   }
 }
 
@@ -64,6 +71,7 @@ export default function Launchpad() {
   const [ticker, setTicker] = useState(initial.ticker);
   const [desc, setDesc] = useState(initial.desc);
   const [logo, setLogo] = useState<string>(initial.logo);
+  const [maxSupply, setMaxSupply] = useState<string>(initial.maxSupply);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<LaunchTokenResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -71,13 +79,16 @@ export default function Launchpad() {
   useEffect(() => {
     const t = setTimeout(() => {
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ name, ticker, desc, logo }));
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ name, ticker, desc, logo, maxSupply }),
+        );
       } catch {
         /* ignore */
       }
     }, 400);
     return () => clearTimeout(t);
-  }, [name, ticker, desc, logo]);
+  }, [name, ticker, desc, logo, maxSupply]);
 
   const onPickLogo = () => {
     setLogoError(null);
@@ -111,7 +122,12 @@ export default function Launchpad() {
   };
 
   const onDeploy = async () => {
-    const result = await launch({ name, ticker, description: desc });
+    const result = await launch({
+      name,
+      ticker,
+      description: desc,
+      maxSupply: maxSupply || DEFAULT_MAX_SUPPLY,
+    });
     if (result) {
       setLastResult(result);
       try {
@@ -123,13 +139,16 @@ export default function Launchpad() {
       setTicker("");
       setDesc("");
       setLogo("");
+      setMaxSupply(DEFAULT_MAX_SUPPLY);
     }
   };
 
+  const maxSupplyNum = Number(maxSupply || "0");
   const checks = [
     { key: "name", label: "Token name", ok: name.length >= 3 },
     { key: "ticker", label: "Ticker symbol", ok: ticker.length >= 2 },
     { key: "desc", label: "Description", ok: desc.length >= 20 },
+    { key: "supply", label: "Total supply", ok: maxSupplyNum > 0 },
   ];
   const ready = checks.every((c) => c.ok);
   const subdomain = (ticker.trim() || "ticker").toLowerCase();
@@ -218,6 +237,18 @@ export default function Launchpad() {
           <div className="h-px bg-white/[0.05]" />
 
           <div className="grid gap-3 md:grid-cols-2">
+            <Input
+              label="Total supply"
+              name="max-supply"
+              value={maxSupply}
+              onChange={(e) => setMaxSupply(e.target.value.replace(/[^0-9]/g, ""))}
+              trailing={<span className="font-mono text-[11px]">tokens</span>}
+              hint={
+                maxSupplyNum > 0
+                  ? `${maxSupplyNum.toLocaleString()} tokens · hard cap on circulating supply`
+                  : "Must be greater than zero"
+              }
+            />
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-medium text-on-surface-variant">Subdomain</label>
               <div className="flex items-center rounded-lg bg-[#0F0F11] px-3 py-2.5 ghost-border">
@@ -226,14 +257,11 @@ export default function Launchpad() {
                 <span className="font-mono text-[13.5px] text-on-surface-muted">.fun.init</span>
               </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-medium text-on-surface-variant">
-                Launch target
-              </label>
-              <div className="flex items-center rounded-lg bg-[#0F0F11] px-3 py-2.5 ghost-border">
-                <span className="font-mono text-[13.5px] text-on-surface">{APPCHAIN.chainId}</span>
-              </div>
-            </div>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-lg bg-[#0A0A0C] px-3 py-2 ghost-border text-[11.5px] text-on-surface-muted">
+            <span className="font-medium uppercase tracking-[0.08em]">Launch target</span>
+            <span className="font-mono text-on-surface">{APPCHAIN.chainId}</span>
           </div>
         </Card>
 
@@ -266,6 +294,13 @@ export default function Launchpad() {
               </div>
             </div>
             {desc && <p className="text-[12.5px] leading-[1.55] text-on-surface-variant">{desc}</p>}
+
+            <div className="flex items-baseline justify-between rounded-md bg-[#0A0A0C] px-3 py-2 ghost-border">
+              <span className="text-[11px] font-medium text-on-surface-variant">Total supply</span>
+              <span className="font-mono text-[13px] tabular-nums text-on-surface">
+                {maxSupplyNum > 0 ? maxSupplyNum.toLocaleString() : "—"}
+              </span>
+            </div>
 
             <div className="h-px bg-white/[0.05]" />
 

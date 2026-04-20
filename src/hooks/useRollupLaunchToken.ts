@@ -7,14 +7,18 @@ import { useTxHistory } from "@/hooks/useTxHistory";
 const MSG_EXECUTE_JSON_TYPE_URL = "/initia.move.v1.MsgExecuteJSON";
 
 /** Default bonding-curve params every new pool opens with.
- *  base_price = 1,000 umin = 0.001 MIN/token · slope = 10 */
+ *  base_price = 1,000 umin = 0.001 MIN/token · slope = 10
+ *  max_supply = 1_000_000_000 (1B tokens) — the default pump.fun-style cap. */
 const DEFAULT_BASE_PRICE = "1000";
 const DEFAULT_SLOPE = "10";
+const DEFAULT_MAX_SUPPLY = "1000000000";
 
 export interface LaunchTokenPayload {
   name: string;
   ticker: string;
   description: string;
+  /** Optional override for the hard supply cap (whole tokens). Defaults to 1B. */
+  maxSupply?: string;
 }
 
 export interface LaunchTokenResult {
@@ -59,9 +63,14 @@ export function useRollupLaunchToken() {
       const name = payload.name.trim();
       const description = payload.description.trim();
       const subdomain = `${ticker.toLowerCase()}.fun.init`;
+      const maxSupply = (payload.maxSupply ?? DEFAULT_MAX_SUPPLY).replace(/[^0-9]/g, "");
 
       if (!ticker || !name) {
         toast.push({ tone: "error", title: "Ticker and name are required" });
+        return undefined;
+      }
+      if (!maxSupply || maxSupply === "0") {
+        toast.push({ tone: "error", title: "Total supply must be greater than zero" });
         return undefined;
       }
 
@@ -106,6 +115,7 @@ export function useRollupLaunchToken() {
                 JSON.stringify(ticker),
                 JSON.stringify(DEFAULT_BASE_PRICE),
                 JSON.stringify(DEFAULT_SLOPE),
+                JSON.stringify(maxSupply),
               ],
             },
           },

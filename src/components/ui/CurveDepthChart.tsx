@@ -14,6 +14,7 @@ export function CurveDepthChart({
   basePriceMicroInit,
   slopeMicroInit,
   currentSupply,
+  maxSupply,
   currentReserveMicroInit,
   graduationTargetMicroInit,
   height = 340,
@@ -22,12 +23,14 @@ export function CurveDepthChart({
   basePriceMicroInit: bigint;
   slopeMicroInit: bigint;
   currentSupply: bigint;
+  /** Hard cap on circulating supply (v2). 0n renders no cap marker. */
+  maxSupply?: bigint;
   currentReserveMicroInit: bigint;
   graduationTargetMicroInit: bigint;
   height?: number;
   className?: string;
 }) {
-  const { points, supplyAtGraduation, maxSupply, maxPrice, pctComplete } =
+  const { points, supplyAtGraduation, xMaxDomain, maxPrice, pctComplete, supplyCap } =
     useMemo(() => {
       const base = Number(basePriceMicroInit);
       const slope = Number(slopeMicroInit);
@@ -50,8 +53,9 @@ export function CurveDepthChart({
         supplyGrad = Math.max(curSupply, (-b + Math.sqrt(Math.max(disc, 0))) / (2 * a));
       }
 
-      // X axis domain: 0 → supplyGrad * 1.1 (show a bit beyond target).
-      const xMax = Math.max(supplyGrad * 1.1, curSupply * 1.1, 1);
+      // X axis domain: 0 → max(supplyGrad, maxSupply) × 1.1 (show a bit beyond target).
+      const capNum = maxSupply ? Number(maxSupply) : 0;
+      const xMax = Math.max(supplyGrad * 1.1, curSupply * 1.1, capNum * 1.02, 1);
       const steps = 80;
       const pts: Array<{ x: number; y: number }> = [];
       let yMax = 0;
@@ -70,9 +74,10 @@ export function CurveDepthChart({
       return {
         points: pts,
         supplyAtGraduation: supplyGrad,
-        maxSupply: xMax,
+        xMaxDomain: xMax,
         maxPrice: yMax,
         pctComplete: pct,
+        supplyCap: capNum,
       };
     }, [
       basePriceMicroInit,
@@ -80,17 +85,19 @@ export function CurveDepthChart({
       currentSupply,
       currentReserveMicroInit,
       graduationTargetMicroInit,
+      maxSupply,
     ]);
 
-  const xScale = (x: number) => (x / maxSupply) * 100;
+  const xScale = (x: number) => (x / xMaxDomain) * 100;
   const yScale = (y: number) => 100 - (y / maxPrice) * 100;
 
   const curSupplyNum = Number(currentSupply);
   const curX = xScale(curSupplyNum);
   const gradX = xScale(supplyAtGraduation);
+  const capX = supplyCap > 0 ? xScale(supplyCap) : null;
 
   const curve = points.map((p) => `${xScale(p.x)},${yScale(p.y)}`).join(" ");
-  const area = `${curve} ${xScale(maxSupply)},100 0,100`;
+  const area = `${curve} ${xScale(xMaxDomain)},100 0,100`;
 
   return (
     <div
@@ -164,6 +171,21 @@ export function CurveDepthChart({
           vectorEffect="non-scaling-stroke"
           opacity="0.7"
         />
+
+        {/* Supply cap (v2) */}
+        {capX !== null && (
+          <line
+            x1={capX}
+            y1="0"
+            x2={capX}
+            y2="100"
+            stroke="#FB7185"
+            strokeWidth="0.4"
+            strokeDasharray="2 1"
+            vectorEffect="non-scaling-stroke"
+            opacity="0.8"
+          />
+        )}
       </svg>
 
       {/* Legend */}
@@ -180,6 +202,12 @@ export function CurveDepthChart({
           <span className="inline-block h-[2px] w-3 bg-[#10B981]" />
           Graduation target
         </span>
+        {capX !== null && (
+          <span className="flex items-center gap-1.5 font-mono text-on-surface-variant">
+            <span className="inline-block h-[2px] w-3 bg-[#FB7185]" />
+            Supply cap · {supplyCap.toLocaleString()}
+          </span>
+        )}
       </div>
 
       <div className="absolute bottom-3 right-3 font-mono text-[10.5px] text-on-surface-muted">

@@ -6,18 +6,18 @@ import { useToast } from "@/components/ui/Toast";
 const MSG_EXECUTE_JSON = "/initia.move.v1.MsgExecuteJSON";
 const DEFAULT_BASE_PRICE = "1000";
 const DEFAULT_SLOPE = "10";
+const DEFAULT_MAX_SUPPLY = "1000000000";
 
 /** Opens the bonding-curve pool for a pre-existing token (token launched
- *  before Launchpad was bundling create_pool with launch). Permissionless
- *  -- any wallet can open the pool for any ticker, though convention is
- *  that the original creator does it. */
+ *  before Launchpad was bundling create_pool with launch). v2 requires
+ *  the caller to be the token_factory launcher AND a max_supply cap. */
 export function useCreatePoolAction() {
   const kit = useInterwovenKit();
   const toast = useToast();
   const [isPending, setPending] = useState(false);
 
   const create = useCallback(
-    async (ticker: string): Promise<string | undefined> => {
+    async (ticker: string, maxSupply: string = DEFAULT_MAX_SUPPLY): Promise<string | undefined> => {
       if (!APPCHAIN_RPC_AVAILABLE) {
         toast.push({ tone: "error", title: "Appchain RPC unavailable" });
         return undefined;
@@ -50,6 +50,7 @@ export function useCreatePoolAction() {
                 JSON.stringify(upper),
                 JSON.stringify(DEFAULT_BASE_PRICE),
                 JSON.stringify(DEFAULT_SLOPE),
+                JSON.stringify(maxSupply.replace(/[^0-9]/g, "") || DEFAULT_MAX_SUPPLY),
               ],
             },
           },

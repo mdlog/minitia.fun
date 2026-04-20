@@ -6,6 +6,7 @@ export interface PoolState {
   exists: boolean;
   initReserve: bigint;
   tokenSupply: bigint;
+  maxSupply: bigint;
   basePrice: bigint;
   slope: bigint;
   feeAccumulated: bigint;
@@ -67,6 +68,7 @@ async function fetchPool(ticker: string): Promise<PoolState | undefined> {
       exists: false,
       initReserve: 0n,
       tokenSupply: 0n,
+      maxSupply: 0n,
       basePrice: 0n,
       slope: 0n,
       feeAccumulated: 0n,
@@ -82,12 +84,17 @@ async function fetchPool(ticker: string): Promise<PoolState | undefined> {
     [`"${APPCHAIN.deployedAddress}"`, tickerArg],
   );
   if (!tuple || tuple.length < 7) return undefined;
-  const [reserve, supply, base, slope, fee, count, graduated] = tuple.map((s) => BigInt(s));
+  const [reserve, supply, base, slope, fee, count, graduated] = tuple
+    .slice(0, 7)
+    .map((s) => BigInt(s));
+  // v2 contract extends the tuple with max_supply at index 7.
+  const maxSupply = tuple.length > 7 ? BigInt(tuple[7]) : 0n;
   return {
     ticker,
     exists: true,
     initReserve: reserve,
     tokenSupply: supply,
+    maxSupply,
     basePrice: base,
     slope,
     feeAccumulated: fee,

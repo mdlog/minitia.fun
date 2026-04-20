@@ -150,3 +150,69 @@ Effects:
 - Entry signatures are unchanged. No client-side migration needed.
 
 Abort codes added: `E_TICKER_NOT_LAUNCHED = 13`, `E_NOT_LAUNCHER = 14`.
+
+## v2 — Fresh appchain migration (supply cap)
+
+Adding `max_supply` to the `Pool` struct breaks compatible upgrades (storage
+layout change). v2 is deployed onto a **new appchain** rather than upgraded
+in place. Old appchain is frozen as the hackathon/testnet snapshot.
+
+### Contract changes
+
+- `bonding_curve::create_pool` new signature:
+  `create_pool(creator, registry_addr, ticker, base_price, slope, max_supply)`
+- `Pool` struct adds `max_supply: u128`
+- `buy` aborts with `E_SUPPLY_CAP` if `token_supply + tokens_out > max_supply`
+- Graduation now fires on reserve threshold **OR** supply cap reached
+- `pool_state` view returns 8 elements (appends `max_supply` at index 7)
+- `PoolCreated` event includes `max_supply`
+- Abort codes added: `E_SUPPLY_CAP = 15`, `E_INVALID_SUPPLY = 16`
+
+### Migration steps
+
+```bash
+# 1. Spawn a fresh appchain
+weave rollup launch --chain-id minitia-fun-v2-1 --with-config rollup-v2.json
+
+# 2. Deploy modules fresh to the new appchain
+cd contracts
+minitiad move build
+minitiad move deploy \
+  --from gas-station \
+  --chain-id minitia-fun-v2-1 \
+  --keyring-backend test \
+  --node http://localhost:26657
+
+# 3. Initialize registries (same as initial deploy)
+minitiad tx move execute <DEPLOYED_ADDR> token_factory initialize ...
+minitiad tx move execute <DEPLOYED_ADDR> bonding_curve initialize ...
+minitiad tx move execute <DEPLOYED_ADDR> bonding_curve initialize_custody ...
+minitiad tx move execute <DEPLOYED_ADDR> liquidity_migrator initialize ...
+
+# 4. Point the frontend at v2
+# Edit src/lib/initia.ts:
+#   APPCHAIN.chainId = "minitia-fun-v2-1"
+#   APPCHAIN.rpc     = "<new rpc>"
+#   APPCHAIN.rest    = "<new rest>"
+#   APPCHAIN.deployedAddress = "<new module address>"
+```
+
+### Client impact
+
+- `useRollupLaunchToken` + `useCreatePoolAction` now pass `max_supply` as the
+  5th `create_pool` arg (default 1,000,000,000). Old v1 appchain deployments
+  would abort — so frontend only targets v2 after `src/lib/initia.ts` is
+  updated.
+- `usePoolState` reads `max_supply` from tuple index 7; legacy v1 reads
+  (tuple length 7) return `maxSupply = 0n` and the UI falls back to
+  "uncapped" behavior (FDV = spot × current supply instead of spot × cap).
+- `Launchpad.tsx` exposes a "Total supply" input (default 1B tokens).
+- Trade page shows FDV = `spot × max_supply` and a new "Supply" stat showing
+  `tokens_sold / max_supply` percentage.
+- `CurveDepthChart` renders a rose dashed line at the supply cap.
+
+### What is NOT migrated
+
+Pools, balances, promotion stages, and claimed-fee state on the old appchain
+do not carry over. Users re-launch on v2 under the same ticker if the name
+is still available. Announce the migration clearly before cutover.

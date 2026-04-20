@@ -116,8 +116,16 @@ export default function Trade() {
 
   const marketCapMicroInit = useMemo(() => {
     if (!pool.data?.exists) return 0n;
-    // spotPrice (umin/token) * supply (whole tokens) = umin market cap
-    return pool.data.spotPrice * pool.data.tokenSupply;
+    // Fully-diluted market cap = spot × max_supply. Stable as supply mints,
+    // matches the memecoin mental model (1B cap × price = headline number).
+    // Falls back to current supply for legacy v1 pools where max_supply is 0.
+    const denom = pool.data.maxSupply > 0n ? pool.data.maxSupply : pool.data.tokenSupply;
+    return pool.data.spotPrice * denom;
+  }, [pool.data]);
+
+  const supplyProgressPct = useMemo(() => {
+    if (!pool.data?.exists || pool.data.maxSupply === 0n) return 0;
+    return Number((pool.data.tokenSupply * 10_000n) / pool.data.maxSupply) / 100;
   }, [pool.data]);
 
   const amountMicro = useMemo(() => {
@@ -280,10 +288,19 @@ export default function Trade() {
                 unit="MIN"
               />
               <Stat
-                label="Mkt cap"
-                value={formatMin(marketCapMicroInit / 1_000_000n, 2)}
+                label="FDV"
+                value={formatMin(marketCapMicroInit, 2)}
                 unit="MIN"
               />
+              {pool.data.maxSupply > 0n && (
+                <Stat
+                  label="Supply"
+                  value={`${supplyProgressPct.toFixed(2)}%`}
+                  sub={`${Number(pool.data.tokenSupply).toLocaleString()} / ${Number(
+                    pool.data.maxSupply,
+                  ).toLocaleString()}`}
+                />
+              )}
               <div className="ml-auto flex min-w-[200px] flex-col items-end gap-1.5">
                 <div className="flex items-center gap-2 text-[11px]">
                   <span className="text-on-surface-muted">Graduation</span>
@@ -670,6 +687,7 @@ export default function Trade() {
                       basePriceMicroInit={pool.data.basePrice}
                       slopeMicroInit={pool.data.slope}
                       currentSupply={pool.data.tokenSupply}
+                      maxSupply={pool.data.maxSupply}
                       currentReserveMicroInit={pool.data.initReserve}
                       graduationTargetMicroInit={GRADUATION_THRESHOLD_INIT}
                       height={280}
@@ -684,7 +702,7 @@ export default function Trade() {
                       yellow marker is current supply, the green marker is approximate supply
                       at graduation.
                     </p>
-                    <div className="grid grid-cols-3 gap-3 border-t border-white/[0.05] pt-3 text-[11px]">
+                    <div className="grid grid-cols-2 gap-3 border-t border-white/[0.05] pt-3 text-[11px] md:grid-cols-4">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-on-surface-muted">Base price</span>
                         <span className="font-mono tabular-nums text-on-surface">
@@ -695,6 +713,14 @@ export default function Trade() {
                         <span className="text-on-surface-muted">Slope</span>
                         <span className="font-mono tabular-nums text-on-surface">
                           {formatMin(pool.data.slope, 6)} MIN/token
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-on-surface-muted">Max supply</span>
+                        <span className="font-mono tabular-nums text-on-surface">
+                          {pool.data.maxSupply > 0n
+                            ? Number(pool.data.maxSupply).toLocaleString()
+                            : "—"}
                         </span>
                       </div>
                       <div className="flex flex-col gap-0.5">

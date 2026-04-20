@@ -29,7 +29,7 @@ Minitia.fun is a fair-launch appchain launcher on Initia where anyone mints a to
 ### How to Run Locally
 
 1. `npm install` — installs React 19 + Vite + InterwovenKit + wagmi + viem + TanStack Query.
-2. `cp .env.example .env.local` and point `VITE_APPCHAIN_RPC` / `VITE_APPCHAIN_REST` at the live tunnel (`https://evonft.xyz` / `https://nectiq.xyz`) or leave blank to skip rollup reads.
+2. `cp .env.example .env.local` and point `VITE_APPCHAIN_RPC` / `VITE_APPCHAIN_REST` at the live tunnel (`https://rpc.minitia.fun` / `https://rest.minitia.fun`) or leave blank to skip rollup reads.
 3. `npm run dev` — dev server at `http://localhost:5173`. Grab testnet INIT from [`faucet.testnet.initia.xyz`](https://faucet.testnet.initia.xyz) if the wallet is empty.
 4. Connect via MetaMask / Keplr / Leap / Privy, click **"Enable auto-sign"** in the top bar (one popup, then silence), then launch a token at `/launchpad` or buy `$MOVE` at `/trade/MOVE`. Every action hits the live `minitia-fun-test-1` Move rollup.
 
@@ -49,8 +49,8 @@ For a category where users send real MIN into a curve they don't control, Move's
 | Artefact | Value |
 |---|---|
 | **Rollup chain ID** | `minitia-fun-test-1` (Move VM, Initia DA) |
-| **Rollup RPC** (public) | [`https://evonft.xyz`](https://evonft.xyz/status) — judges: check `/status` for live height |
-| **Rollup REST** (public) | [`https://nectiq.xyz`](https://nectiq.xyz/cosmos/base/tendermint/v1beta1/node_info) — chain info + generic cosmos routes |
+| **Rollup RPC** (public) | [`https://rpc.minitia.fun`](https://rpc.minitia.fun/status) — judges: check `/status` for live height |
+| **Rollup REST** (public) | [`https://rest.minitia.fun`](https://rest.minitia.fun/cosmos/base/tendermint/v1beta1/node_info) — chain info + generic cosmos routes |
 | **Rollup RPC** (local) | `tcp://localhost:36657` |
 | **Deployed module address** | `0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80` (aka `init1czna6myw50xttzp3k2rcldekttmmukuqcu4u6c`) |
 | **Published modules** | `token_factory`, `bonding_curve`, `comments`, `liquidity_migrator` (4 modules, all state init'd) |
@@ -65,7 +65,7 @@ Every view call above is reproducible with one `curl`:
 
 ```bash
 # authoritative token count
-curl -s -X POST https://nectiq.xyz/initia/move/v1/view/json \
+curl -s -X POST https://rest.minitia.fun/initia/move/v1/view/json \
   -H 'Content-Type: application/json' \
   -d '{"address":"0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80",
        "module_name":"token_factory","function_name":"count",

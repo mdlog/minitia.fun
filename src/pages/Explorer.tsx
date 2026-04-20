@@ -1,5 +1,6 @@
 import { ArrowUpRight, Copy, RefreshCcw } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { ExplorerSearchBar } from "@/components/explorer/SearchBar";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
@@ -56,9 +57,9 @@ const actionLabel: Record<MoveTx["action"], string> = {
 };
 
 export default function Explorer() {
-  const network = useNetworkStatus(3_000);
+  const network = useNetworkStatus(15_000);
   const stats = useAppchainStats(10_000);
-  const blocks = useRecentBlocks(15, 3_000);
+  const blocks = useRecentBlocks(20, 15_000);
   const txs = useRecentMoveTxs(20, 10_000);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -278,13 +279,12 @@ export default function Explorer() {
           </div>
 
           <div className="divide-y divide-editorial/10 rounded-xl surface-nested ghost-border overflow-hidden">
-            {(blocks.data ?? []).slice(0, 15).map((b) => (
-              <a
+            {(blocks.data ?? []).slice(0, 20).map((b, i) => (
+              <Link
                 key={b.height}
-                href={`${rpcBase}/block?height=${b.height}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-3 px-3 py-2.5 snappy transition-colors hover:bg-white/[0.04]"
+                to={`/block/${b.height}`}
+                style={{ ["--d" as never]: `${i * 60}ms` }}
+                className="reveal flex items-center gap-3 px-3 py-2.5 snappy transition-colors hover:bg-white/[0.04]"
               >
                 <span className="font-editorial italic text-title-md text-editorial">
                   #{b.height}
@@ -298,7 +298,7 @@ export default function Explorer() {
                 <span className="font-mono text-body-sm text-on-surface-muted w-[6.5rem] text-right">
                   {relativeTime(b.time)}
                 </span>
-              </a>
+              </Link>
             ))}
             {(blocks.data ?? []).length === 0 && !blocks.isFetching && (
               <div className="px-4 py-6 text-center text-body-sm text-on-surface-muted">
@@ -362,15 +362,13 @@ export default function Explorer() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a
-                    href={`${rpcBase}/tx?hash=0x${t.hash}`}
-                    target="_blank"
-                    rel="noreferrer"
+                  <Link
+                    to={`/tx/${t.hash}`}
                     className="group flex-1 truncate font-mono text-body-sm text-editorial-ink hover:text-editorial snappy"
                   >
                     0x{shortHash(t.hash, 10)}
                     <ArrowUpRight className="ml-1 inline h-3 w-3 opacity-60 group-hover:opacity-100" />
-                  </a>
+                  </Link>
                   <button
                     type="button"
                     onClick={() => copy(t.hash)}

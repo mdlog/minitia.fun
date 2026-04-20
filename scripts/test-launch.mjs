@@ -9,7 +9,7 @@ import { aminoConverters, protoRegistry } from "@initia/amino-converter";
 // but it'll prove the encoding works without wallet popup.
 
 const MNEMONIC = "youth tortoise income submit pony useless fly garage reveal weekend make cook wild basic tuition door pull apple throw raise vessel page portion account";
-const RPC = "https://evonft.xyz";
+const RPC = "https://rpc.minitia.fun";
 
 (async () => {
   const wallet = await DirectSecp256k1HdWallet.fromMnemonic(MNEMONIC, {

@@ -1,7 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, ExternalLink, Hash, Layers, Search, User2 } from "lucide-react";
-import { APPCHAIN } from "@/lib/initia";
+import { ArrowUpRight, Hash, Layers, Search, User2 } from "lucide-react";
 import { bech32ToHex, isBech32Address } from "@/lib/address";
 
 type Detected =
@@ -72,10 +71,10 @@ export function ExplorerSearchBar() {
   const go = (d: Detected) => {
     switch (d.kind) {
       case "tx":
-        window.open(`${APPCHAIN.rpc}/tx?hash=0x${d.hash}`, "_blank", "noopener,noreferrer");
+        navigate(`/tx/${d.hash}`);
         return;
       case "block":
-        window.open(`${APPCHAIN.rpc}/block?height=${d.height}`, "_blank", "noopener,noreferrer");
+        navigate(`/block/${d.height}`);
         return;
       case "address_hex":
         navigate(`/u/${d.address}`);
@@ -134,27 +133,13 @@ export function ExplorerSearchBar() {
           {detected.kind === "tx" && (
             <>
               <span>·</span>
-              <a
-                href={`${APPCHAIN.rpc}/tx?hash=0x${detected.hash}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-editorial-ink hover:text-editorial"
-              >
-                open in RPC <ExternalLink className="h-3 w-3" />
-              </a>
+              <span className="text-editorial-ink">/tx/…</span>
             </>
           )}
           {detected.kind === "block" && (
             <>
               <span>·</span>
-              <a
-                href={`${APPCHAIN.rpc}/block?height=${detected.height}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-editorial-ink hover:text-editorial"
-              >
-                open in RPC <ExternalLink className="h-3 w-3" />
-              </a>
+              <span className="text-editorial-ink">/block/{detected.height}</span>
             </>
           )}
           {detected.kind === "ticker" && (

@@ -15,7 +15,7 @@ reproducible with a `curl` against the public tunnels.
 | Subdomain | `SPX.fun.init` | same |
 
 ```bash
-curl -s -X POST https://nectiq.xyz/initia/move/v1/view/json \
+curl -s -X POST https://rest.minitia.fun/initia/move/v1/view/json \
   -H 'Content-Type: application/json' \
   -d '{"address":"0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80",
        "module_name":"token_factory","function_name":"info",
@@ -25,7 +25,7 @@ curl -s -X POST https://nectiq.xyz/initia/move/v1/view/json \
 ## 2 · Transaction chain (all `code: 0`, all on `minitia-fun-test-1`)
 
 Every tx is inspectable via the public tunneled RPC
-`https://evonft.xyz/tx?hash=0x<hash>`.
+`https://rpc.minitia.fun/tx?hash=0x<hash>`.
 
 | # | Step | Tx hash | Height | Evidence |
 |---|---|---|---|---|
@@ -92,14 +92,14 @@ Anyone can clone the repo + point at the same tunnel and replay:
 
 ```bash
 # 1. View the bonding-curve state
-curl -s https://nectiq.xyz/initia/move/v1/view/json \
+curl -s https://rest.minitia.fun/initia/move/v1/view/json \
   -H 'Content-Type: application/json' \
   -d '{"address":"0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80",
        "module_name":"liquidity_migrator","function_name":"stage_of",
        "type_args":[],"args":["\"0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80\"","\"SPX\""]}'
 
 # 2. Read any of the 5 tx hashes
-curl -s "https://evonft.xyz/tx?hash=0x968F414F5A9662091C077835ED2F26C8572FA28B39BB73546EA6A3CE466D5307"
+curl -s "https://rpc.minitia.fun/tx?hash=0x968F414F5A9662091C077835ED2F26C8572FA28B39BB73546EA6A3CE466D5307"
 
 # 3. If minitiad + weave are installed:
 node scripts/spawn-local.mjs SPX --force     # spawn a fresh spx-fun-1

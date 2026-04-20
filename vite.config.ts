@@ -12,6 +12,12 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    allowedHosts: ["minitia.fun", ".minitia.fun"],
+    hmr: {
+      host: "minitia.fun",
+      protocol: "wss",
+      clientPort: 443,
+    },
   },
   build: {
     // Route-level split via React.lazy ships pages as separate chunks (~4-16KB).

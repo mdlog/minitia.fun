@@ -49,7 +49,12 @@ async function fetchBlocks(count: number): Promise<BlockMeta[]> {
   }));
 }
 
-export function useRecentBlocks(count = 15, pollMs = 3_000) {
+/**
+ * Initial fetch of the last N blocks via `/blockchain`. Realtime updates
+ * are pushed into this cache by `useNetworkStatus`, which owns the single
+ * WebSocket subscription to Tendermint's `NewBlock` event.
+ */
+export function useRecentBlocks(count = 15, pollMs = 15_000) {
   return useQuery({
     queryKey: ["recentBlocks", APPCHAIN.rpc, count],
     queryFn: () => fetchBlocks(count),

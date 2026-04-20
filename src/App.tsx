@@ -9,6 +9,8 @@ const Trade = lazy(() => import("@/pages/Trade"));
 const Graduation = lazy(() => import("@/pages/Graduation"));
 const Airdrops = lazy(() => import("@/pages/Airdrops"));
 const Explorer = lazy(() => import("@/pages/Explorer"));
+const TxDetail = lazy(() => import("@/pages/TxDetail"));
+const BlockDetail = lazy(() => import("@/pages/BlockDetail"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
 
 function RouteFallback() {
@@ -34,6 +36,8 @@ export default function App() {
           <Route path="/graduation" element={<Navigate to="/graduation/MOVE" replace />} />
           <Route path="/airdrops" element={<Airdrops />} />
           <Route path="/explorer" element={<Explorer />} />
+          <Route path="/tx/:hash" element={<TxDetail />} />
+          <Route path="/block/:height" element={<BlockDetail />} />
           <Route path="/u/:address" element={<UserProfile />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

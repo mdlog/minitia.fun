@@ -523,11 +523,17 @@ export default function Graduation() {
               </span>
             </div>
             <p className="text-[12px] leading-[1.6] text-on-surface-variant">
-              Event on-chain. Promoter will generate{" "}
+              Event on-chain. With{" "}
+              <code className="font-mono text-on-surface">npm run promoter</code>{" "}
+              running, the daemon will generate{" "}
               <code className="font-mono text-on-surface">
                 rollup-{ticker.toLowerCase()}.json
-              </code>{" "}
-              and run <code className="font-mono text-on-surface">weave rollup launch</code>.
+              </code>
+              , spawn a sovereign minimove chain via{" "}
+              <code className="font-mono text-on-surface">scripts/spawn-local.mjs</code>
+              , wait for first block, and auto-call{" "}
+              <code className="font-mono text-on-surface">record_rollup</code>. Usually
+              completes within ~1 minute; this card will flip emerald when done.
             </p>
             <div className="grid gap-2 font-mono text-[10.5px] md:grid-cols-3">
               <span>

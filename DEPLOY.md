@@ -211,6 +211,41 @@ minitiad tx move execute <DEPLOYED_ADDR> liquidity_migrator initialize ...
   `tokens_sold / max_supply` percentage.
 - `CurveDepthChart` renders a rose dashed line at the supply cap.
 
+### Running the promoter daemon (auto-spawn graduated rollups)
+
+For graduations to flip from amber "staged" to emerald "live" without
+manual shell commands, `scripts/promoter.mjs` must be running as a
+long-lived process. It polls the bonding-curve rollup for
+`PromotionStaged` events (both direct `MsgExecuteJSON` and authz-wrapped
+`MsgExec`), spawns a sovereign minimove chain per ticker via
+`scripts/spawn-local.mjs`, and auto-calls
+`liquidity_migrator::record_rollup` with the new chain's coordinates.
+
+```bash
+# live run (spawns chains + records on-chain)
+npm run promoter
+
+# dry run (prints commands without executing)
+npm run promoter:dry
+```
+
+Environment overrides:
+
+| Var | Default | Notes |
+|---|---|---|
+| `APPCHAIN_RPC` | `http://localhost:26657` | v2 bonding-curve rollup RPC |
+| `CHAIN_ID` | `minitia-fun-v2-1` | used for `record_rollup` tx signing |
+| `DEPLOYED_ADDRESS` | `0xC0A7DD6...80` | module owner |
+| `POLL_MS` | `15000` | event poll interval |
+| `AUTO` | `1` | set to `0` to dry-run |
+
+The daemon persists `promoter-work/state.json` so a restart doesn't
+re-spawn chains that are already live. To force a retry for a specific
+ticker, manually delete its entry from `state.json`.
+
+For production, wrap this in systemd / PM2 so it survives machine
+reboots.
+
 ### Compatible upgrade — `claim_reserve` entry (post-v2)
 
 Adds one public entry function + a new event + two error codes to

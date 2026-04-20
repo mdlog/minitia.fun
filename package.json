@@ -10,7 +10,10 @@
     "build:explorer": "tsc -b && vite build --config vite.explorer.config.ts && mv dist-explorer/explorer.html dist-explorer/index.html",
     "preview": "vite preview",
     "preview:explorer": "vite preview --config vite.explorer.config.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "promoter": "node scripts/promoter.mjs",
+    "promoter:dry": "AUTO=0 node scripts/promoter.mjs",
+    "faucet": "RPC=tcp://localhost:26657 CHAIN_ID=minitia-fun-v2-1 node scripts/faucet-server.mjs"
   },
   "dependencies": {
     "@cosmjs/encoding": "^0.36.2",

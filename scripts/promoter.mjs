@@ -1,51 +1,65 @@
 #!/usr/bin/env node
 /**
- * Minitia.fun appchain promoter daemon.
+ * Minitia.fun appchain promoter daemon (v2).
  * ----------------------------------------------------------------------------
  * Long-running process that watches the bonding-curve rollup for
- * liquidity_migrator::PromotionStaged events, assembles a Weave rollup launch
- * config per graduated ticker, and (optionally) invokes `weave rollup launch`
- * to spawn the new appchain.
+ * liquidity_migrator::PromotionStaged events, writes a rollup config per
+ * graduated ticker, spawns a sovereign minimove chain via
+ * scripts/spawn-local.mjs, waits for the new chain to produce its first
+ * block, and calls liquidity_migrator::record_rollup to flip the
+ * Graduation card from amber "staged" to emerald "live" on the UI.
  *
- * Design:
- * - Poll the tendermint RPC tx_search endpoint every POLL_MS (default 15s).
- * - Dedupe already-seen tickers in-process + via an on-disk state file so a
- *   restart doesn't re-launch a rollup that's already live.
- * - For each new stage: generate rollup-{ticker}.json in WORKDIR and either
- *   (a) shell out to `weave rollup launch --with-config <path>` if AUTO=1, or
- *   (b) print the exact command for the operator to run manually.
- * - Once the operator (or AUTO) confirms the rollup is live, call
- *   liquidity_migrator::record_rollup via minitiad CLI to persist
- *   (chain_id, rpc_url, first_block_tx) on-chain.
+ * Why spawn-local.mjs instead of `weave rollup launch` directly:
+ *   - weave is interactive even with --with-config (OP-bridge funding
+ *     confirmation, relayer setup). A daemon can't handle prompts.
+ *   - spawn-local.mjs is non-interactive, sovereign (no L1 INIT deposit),
+ *     and writes promoter-work/live-<ticker>.json with chain_id + rpc
+ *     + first_block_tx on success. Perfect handoff.
  *
  * Env:
- *   APPCHAIN_RPC         bonding-curve rollup RPC (default http://localhost:36657)
- *   APPCHAIN_REST        bonding-curve rollup REST (default http://localhost:1317)
- *   DEPLOYED_ADDRESS     module admin address (default 0xC0A7DD6...)
- *   WORKDIR              where to write configs / state (default ./promoter-work)
- *   WEAVE_BIN            path to weave binary (default /home/mdlog/bin/weave)
- *   MINITIAD_BIN         path to minitiad (default ~/.weave/data/minimove.../minitiad)
- *   MINITIAD_LIB_DIR     lib dir for minitiad (default ~/.weave/data/minimove...)
- *   POLL_MS              poll interval in ms (default 15000)
- *   AUTO                 when 1, actually exec `weave rollup launch`. Otherwise dry-run.
+ *   APPCHAIN_RPC         default http://localhost:26657   (v2 port)
+ *   APPCHAIN_REST        default http://localhost:1317
+ *   CHAIN_ID             default minitia-fun-v2-1
+ *   DEPLOYED_ADDRESS     default 0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80
+ *   WORKDIR              default ./promoter-work
+ *   MINITIAD_BIN         default ~/.weave/data/minimove@v1.1.11/minitiad
+ *   MINITIAD_LIB_DIR     default ~/.weave/data/minimove@v1.1.11
+ *   POLL_MS              default 15000
+ *   AUTO                 when "1" (default) spawns chains + records on-chain
+ *                        automatically. Set "0" for dry-run (prints
+ *                        commands, doesn't execute).
  */
 
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
 
-const APPCHAIN_RPC = process.env.APPCHAIN_RPC || "http://localhost:36657";
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = resolve(__dirname, "..");
+
+const APPCHAIN_RPC = process.env.APPCHAIN_RPC || "http://localhost:26657";
 const APPCHAIN_REST = process.env.APPCHAIN_REST || "http://localhost:1317";
-const DEPLOYED_ADDRESS = (process.env.DEPLOYED_ADDRESS || "0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80").toLowerCase();
-const WORKDIR = resolve(process.env.WORKDIR || "./promoter-work");
-const WEAVE_BIN = process.env.WEAVE_BIN || "/home/mdlog/bin/weave";
-const MINITIAD_BIN = process.env.MINITIAD_BIN || "/home/mdlog/.weave/data/minimove@v1.1.11/minitiad";
-const MINITIAD_LIB = process.env.MINITIAD_LIB_DIR || "/home/mdlog/.weave/data/minimove@v1.1.11";
+const CHAIN_ID = process.env.CHAIN_ID || "minitia-fun-v2-1";
+const DEPLOYED_ADDRESS = (
+  process.env.DEPLOYED_ADDRESS || "0xC0A7DD6C8EA3CCB58831B2878FB7365AF7BE5B80"
+).toLowerCase();
+const WORKDIR = resolve(process.env.WORKDIR || join(PROJECT_ROOT, "promoter-work"));
+const MINITIAD_BIN =
+  process.env.MINITIAD_BIN || join(homedir(), ".weave/data/minimove@v1.1.11/minitiad");
+const MINITIAD_LIB =
+  process.env.MINITIAD_LIB_DIR || join(homedir(), ".weave/data/minimove@v1.1.11");
 const POLL_MS = Number(process.env.POLL_MS || 15_000);
-const AUTO = process.env.AUTO === "1";
+// Default AUTO=1 so the daemon actually does the work. Set AUTO=0 for dry-run.
+const AUTO = (process.env.AUTO ?? "1") === "1";
+
+const SPAWN_LOCAL = join(PROJECT_ROOT, "scripts/spawn-local.mjs");
 
 mkdirSync(WORKDIR, { recursive: true });
 const STATE_FILE = join(WORKDIR, "state.json");
+
+// ---- utils -----------------------------------------------------------------
 
 function loadState() {
   if (!existsSync(STATE_FILE)) return { staged: {}, live: {} };
@@ -70,16 +84,35 @@ async function fetchJson(url) {
   return res.json();
 }
 
-async function fetchStagedEvents() {
-  const q = encodeURIComponent(`"message.action='/initia.move.v1.MsgExecuteJSON'"`);
+async function fetchTxsByAction(action) {
+  const q = encodeURIComponent(`"message.action='${action}'"`);
   const url = `${APPCHAIN_RPC}/tx_search?query=${q}&per_page=100&order_by=%22desc%22`;
   const json = await fetchJson(url);
+  return json?.result?.txs ?? [];
+}
+
+/**
+ * Parse PromotionStaged events from BOTH direct MsgExecuteJSON txs and
+ * authz-wrapped (MsgExec) — required because auto-sign routes everything
+ * through authz and CometBFT only indexes the outer action attribute.
+ */
+async function fetchStagedEvents() {
+  const [direct, wrapped] = await Promise.all([
+    fetchTxsByAction("/initia.move.v1.MsgExecuteJSON"),
+    fetchTxsByAction("/cosmos.authz.v1beta1.MsgExec"),
+  ]);
+  const txs = [...direct, ...wrapped].sort(
+    (a, b) => Number(b.height ?? 0) - Number(a.height ?? 0),
+  );
+  const seen = new Set();
   const out = [];
-  for (const tx of json?.result?.txs ?? []) {
+  for (const tx of txs) {
     if ((tx.tx_result?.code ?? 1) !== 0) continue;
+    if (seen.has(tx.hash)) continue;
+    seen.add(tx.hash);
     for (const ev of tx.tx_result?.events ?? []) {
       if (ev.type !== "move") continue;
-      const attrs = Object.fromEntries((ev.attributes ?? []).map(a => [a.key, a.value]));
+      const attrs = Object.fromEntries((ev.attributes ?? []).map((a) => [a.key, a.value]));
       if (!attrs.type_tag?.endsWith("::liquidity_migrator::PromotionStaged")) continue;
       try {
         const data = JSON.parse(attrs.data || "{}");
@@ -107,42 +140,32 @@ function tickerToDenom(ticker) {
 }
 
 /**
- * Minimal rollup launch config. We keep the OP bridge + gas params identical
- * to the live minitia-fun-test-1 config (see ~/.weave/data/minitia.config.json)
- * and just swap chain_id + moniker + the creator's genesis allocation.
+ * Minimal rollup launch config consumed by spawn-local.mjs. The native
+ * denom of the spawned chain is `u<ticker>` — effectively "the memecoin
+ * IS the gas token". Creator is seeded with final_reserve worth so the
+ * chain is immediately usable (deploy contracts, transfer, etc.).
  *
- * system_keys are intentionally NOT included: operators should let `weave
- * rollup launch` generate fresh keys during interactive setup, OR fill them
- * in per-environment. The promoter's job is scaffolding, not key custody.
+ * Conceptually: final_reserve represents total MIN deposited into the
+ * curve. Mapping 1:1 to u<ticker> at genesis lets the creator then seed
+ * a DEX pool or airdrop holders on the new chain with real backing.
  */
 function buildConfig(ev) {
   const chain_id = tickerToChainId(ev.ticker);
   const denom = tickerToDenom(ev.ticker);
   return {
     l1_config: {
-      chain_id: "initiation-2",
-      rpc_url: "https://rpc.testnet.initia.xyz:443",
-      gas_prices: "0.015uinit",
+      chain_id: CHAIN_ID,
+      rpc_url: APPCHAIN_RPC,
+      gas_prices: "0.15umin",
     },
     l2_config: {
       chain_id,
       denom,
       moniker: `${chain_id}-validator`,
     },
-    op_bridge: {
-      output_submission_interval: "1m",
-      output_finalization_period: "168h",
-      output_submission_start_height: 1,
-      batch_submission_target: "INITIA",
-      enable_oracle: true,
-    },
-    // Creator seeded with final_reserve worth of gas denom so the new chain
-    // is usable the moment it boots. Supply token custody is handled by a
-    // follow-up Move publish on the spawned chain (phase A.6).
     genesis_accounts: [
       { address: ev.creator, coins: `${ev.final_reserve}${denom}` },
     ],
-    /** marker so downstream tools know this config was auto-generated */
     minitia_fun: {
       ticker: ev.ticker,
       staged_by: DEPLOYED_ADDRESS,
@@ -154,102 +177,160 @@ function buildConfig(ev) {
   };
 }
 
-async function handleStaged(ev, state) {
-  if (state.live[ev.ticker]) {
-    return; // already spawned
-  }
-  if (state.staged[ev.ticker]) {
-    log(`ticker ${ev.ticker} already staged (tx ${state.staged[ev.ticker].hash}); skipping`);
-    return;
-  }
-  log(`[stage] new PromotionStaged event for $${ev.ticker}`);
-  log(`  creator      : ${ev.creator}`);
-  log(`  final_reserve: ${ev.final_reserve}`);
-  log(`  final_supply : ${ev.final_supply}`);
-  log(`  tx           : ${ev.hash} h=${ev.height}`);
+// ---- spawn + record --------------------------------------------------------
 
-  const cfg = buildConfig(ev);
-  const cfgPath = join(WORKDIR, `rollup-${ev.ticker.toLowerCase()}.json`);
-  writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
-  log(`  config       : ${cfgPath}`);
-
-  state.staged[ev.ticker] = { hash: ev.hash, height: ev.height, cfgPath };
-  saveState(state);
-
-  const minitiaDir = join(WORKDIR, "homes", ev.ticker.toLowerCase());
-  const opinitDir = join(WORKDIR, "opinit", ev.ticker.toLowerCase());
-  const cmd = `${WEAVE_BIN} rollup launch --with-config ${cfgPath} --vm move --minitia-dir ${minitiaDir} --opinit-dir ${opinitDir} --force`;
-
-  if (!AUTO) {
-    log("  AUTO=0; operator must run:");
-    log("  $ " + cmd);
-    log("  Then invoke: node scripts/promoter.mjs record " + ev.ticker + " <rollup_rpc> <first_block_tx>");
-    return;
-  }
-
-  log("  AUTO=1; launching rollup subprocess…");
-  await new Promise((resolvePromise) => {
-    const child = spawn(WEAVE_BIN, [
-      "rollup", "launch",
-      "--with-config", cfgPath,
-      "--vm", "move",
-      "--minitia-dir", minitiaDir,
-      "--opinit-dir", opinitDir,
-      "--force",
-    ], { stdio: "inherit" });
+function runSpawnLocal(ticker) {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn("node", [SPAWN_LOCAL, ticker, "--force"], {
+      env: { ...process.env },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      const s = chunk.toString();
+      stdout += s;
+      for (const line of s.split("\n")) if (line) log(`  [spawn] ${line}`);
+    });
+    child.stderr.on("data", (chunk) => {
+      const s = chunk.toString();
+      stderr += s;
+      for (const line of s.split("\n")) if (line) log(`  [spawn!] ${line}`);
+    });
     child.on("exit", (code) => {
-      if (code === 0) {
-        log(`  weave rollup launch finished ok for ${ev.ticker}`);
-      } else {
-        log(`  weave rollup launch exited code=${code} for ${ev.ticker}`);
-      }
-      resolvePromise();
+      if (code === 0) resolvePromise({ stdout, stderr });
+      else reject(new Error(`spawn-local exited code=${code}: ${stderr.slice(0, 400)}`));
     });
   });
 }
 
+function readLiveSummary(ticker) {
+  const path = join(WORKDIR, `live-${ticker.toLowerCase()}.json`);
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 function recordRollup(ticker, rollupRpc, firstBlockTx) {
   const chain_id = tickerToChainId(ticker);
+  // execute-json expects a JSON array of Move arg values. Signature:
+  //   record_rollup(sender, registry_addr: address, ticker: String,
+  //                 rollup_chain_id: String, rollup_rpc: String,
+  //                 first_block_tx: String)
+  // sender is supplied implicitly via --from, so args starts at registry_addr.
   const args = JSON.stringify([
-    `"${DEPLOYED_ADDRESS}"`,
-    JSON.stringify(ticker.toUpperCase()),
-    JSON.stringify(chain_id),
-    JSON.stringify(rollupRpc),
-    JSON.stringify(firstBlockTx),
-  ]);
-  const argsPath = join(WORKDIR, `record-args-${ticker.toLowerCase()}.json`);
-  writeFileSync(argsPath, args);
-  log(`[record] calling liquidity_migrator::record_rollup for $${ticker}`);
-  const env = { ...process.env, LD_LIBRARY_PATH: MINITIAD_LIB };
-  const r = spawnSync(MINITIAD_BIN, [
-    "tx", "move", "execute-json",
     DEPLOYED_ADDRESS,
-    "liquidity_migrator", "record_rollup",
-    "--args", args,
-    "--from", "gas-station",
-    "--chain-id", "minitia-fun-test-1",
-    "--keyring-backend", "test",
-    "--node", APPCHAIN_RPC,
-    "--gas", "500000",
-    "--gas-prices", "0.15umin",
-    "-y",
-  ], { env, encoding: "utf8" });
+    ticker.toUpperCase(),
+    chain_id,
+    rollupRpc,
+    firstBlockTx,
+  ]);
+  log(`[record] calling liquidity_migrator::record_rollup for $${ticker}`);
+  log(`  chain_id=${chain_id}  rollup_rpc=${rollupRpc}`);
+  const env = { ...process.env, LD_LIBRARY_PATH: MINITIAD_LIB };
+  const r = spawnSync(
+    MINITIAD_BIN,
+    [
+      "tx",
+      "move",
+      "execute-json",
+      DEPLOYED_ADDRESS,
+      "liquidity_migrator",
+      "record_rollup",
+      "--args",
+      args,
+      "--from",
+      "gas-station",
+      "--chain-id",
+      CHAIN_ID,
+      "--keyring-backend",
+      "test",
+      "--node",
+      APPCHAIN_RPC.replace(/^http:/, "tcp:"),
+      "--gas",
+      "500000",
+      "--gas-prices",
+      "0.15umin",
+      "-y",
+    ],
+    { env, encoding: "utf8" },
+  );
   if (r.status !== 0) {
     log("  record_rollup failed:", r.stdout?.slice(0, 400), r.stderr?.slice(0, 400));
-    return;
+    return false;
   }
   const match = r.stdout.match(/txhash: ([A-F0-9]+)/);
   if (match) log(`  record tx broadcast: ${match[1]}`);
   const state = loadState();
-  state.live[ticker.toUpperCase()] = { chain_id, rollupRpc, firstBlockTx, recordedAt: Date.now() };
+  state.live[ticker.toUpperCase()] = {
+    chain_id,
+    rollupRpc,
+    firstBlockTx,
+    recordedAt: Date.now(),
+  };
   delete state.staged[ticker.toUpperCase()];
   saveState(state);
   log(`  ${ticker} now marked live in promoter state`);
+  return true;
 }
+
+// ---- event handler ---------------------------------------------------------
+
+async function handleStaged(ev, state) {
+  if (state.live[ev.ticker]) return; // already spawned + recorded
+  const prior = state.staged[ev.ticker];
+  if (prior && prior.hash === ev.hash) return; // already attempted this exact stage
+  log(`[stage] PromotionStaged for $${ev.ticker}`);
+  log(`  creator       : ${ev.creator}`);
+  log(`  final_reserve : ${ev.final_reserve}`);
+  log(`  final_supply  : ${ev.final_supply}`);
+  log(`  tx            : ${ev.hash} h=${ev.height}`);
+
+  const cfg = buildConfig(ev);
+  const cfgPath = join(WORKDIR, `rollup-${ev.ticker.toLowerCase()}.json`);
+  writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+  log(`  wrote config  : ${cfgPath}`);
+
+  state.staged[ev.ticker] = { hash: ev.hash, height: ev.height, cfgPath };
+  saveState(state);
+
+  if (!AUTO) {
+    log("  AUTO=0 — operator must run:");
+    log(`    $ node ${SPAWN_LOCAL} ${ev.ticker} --force`);
+    log(`    $ node scripts/promoter.mjs record ${ev.ticker} <rpc> <first_tx>`);
+    return;
+  }
+
+  log("  AUTO=1 — spawning sovereign chain via scripts/spawn-local.mjs…");
+  try {
+    await runSpawnLocal(ev.ticker);
+  } catch (err) {
+    log(`  spawn-local failed for ${ev.ticker}: ${err.message}`);
+    return;
+  }
+
+  // spawn-local writes live-<ticker>.json on success — read it for coords.
+  const summary = readLiveSummary(ev.ticker);
+  if (!summary?.rpc || !summary?.chain_id) {
+    log(`  missing live summary for ${ev.ticker}; skipping record`);
+    return;
+  }
+  log(`  spawn ok — rpc=${summary.rpc} first_block_tx=${summary.first_block_tx}`);
+
+  const ok = recordRollup(ev.ticker, summary.rpc, summary.first_block_tx || "genesis");
+  if (!ok) {
+    log(`  record_rollup broadcast failed for ${ev.ticker}; leaving in staged state`);
+  }
+}
+
+// ---- main loop -------------------------------------------------------------
 
 async function watchLoop() {
   log(`watching ${APPCHAIN_RPC} every ${POLL_MS}ms for PromotionStaged events`);
-  log(`workdir: ${WORKDIR}, AUTO=${AUTO ? 1 : 0}`);
+  log(`chain_id=${CHAIN_ID}  workdir=${WORKDIR}  AUTO=${AUTO ? 1 : 0}`);
   const state = loadState();
   /* eslint no-constant-condition: off */
   while (true) {
@@ -263,14 +344,15 @@ async function watchLoop() {
   }
 }
 
-// CLI: `node promoter.mjs record TICKER RPC FIRST_BLOCK_TX`
+// ---- CLI -------------------------------------------------------------------
+
 if (process.argv[2] === "record") {
   const [, , , ticker, rpc, firstBlockTx] = process.argv;
-  if (!ticker || !rpc || !firstBlockTx) {
-    console.error("usage: promoter.mjs record TICKER ROLLUP_RPC FIRST_BLOCK_TX");
+  if (!ticker || !rpc) {
+    console.error("usage: promoter.mjs record TICKER ROLLUP_RPC [FIRST_BLOCK_TX]");
     process.exit(1);
   }
-  recordRollup(ticker, rpc, firstBlockTx);
+  recordRollup(ticker, rpc, firstBlockTx || "genesis");
 } else {
   watchLoop();
 }

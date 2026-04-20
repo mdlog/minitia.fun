@@ -41,6 +41,10 @@ module minitia_fun::token_factory {
         ticker: String,
         name: String,
         description: String,
+        /// IPFS URI or HTTPS URL to the token's logo. Stored as-is; by
+        /// convention ipfs://<cid> for off-chain-pinned assets (Pinata,
+        /// Web3.Storage, Arweave). Empty string = no logo.
+        image_uri: String,
         subdomain: String,
         graduated: bool,
         launch_index: u64,
@@ -52,6 +56,7 @@ module minitia_fun::token_factory {
         creator: address,
         ticker: String,
         name: String,
+        image_uri: String,
         subdomain: String,
         launch_index: u64,
     }
@@ -81,12 +86,17 @@ module minitia_fun::token_factory {
     /// Launch a new token on the registry. Any address can launch - there is
     /// no permissioning at the launcher level. Economic guardrails live in the
     /// bonding_curve module.
+    ///
+    /// `image_uri` is an off-chain pointer (IPFS CID or HTTPS URL). The
+    /// contract stores it as an opaque String; indexers / UIs resolve it
+    /// through their preferred gateway. Pass `""` to launch without a logo.
     public entry fun launch(
         creator: &signer,
         registry_addr: address,
         ticker: String,
         name: String,
         description: String,
+        image_uri: String,
     ) acquires Registry {
         assert_valid_ticker(&ticker);
         assert!(exists<Registry>(registry_addr), error::not_found(E_NOT_INITIALIZED));
@@ -101,6 +111,7 @@ module minitia_fun::token_factory {
             ticker,
             name,
             description,
+            image_uri,
             subdomain,
             graduated: false,
             launch_index,
@@ -113,6 +124,7 @@ module minitia_fun::token_factory {
             creator: signer::address_of(creator),
             ticker,
             name,
+            image_uri,
             subdomain,
             launch_index,
         });

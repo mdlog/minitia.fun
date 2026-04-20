@@ -19,6 +19,9 @@ export interface LaunchTokenPayload {
   description: string;
   /** Optional override for the hard supply cap (whole tokens). Defaults to 1B. */
   maxSupply?: string;
+  /** Off-chain pointer to the token logo (ipfs://<cid> or https://…).
+   *  Empty string launches without a logo. */
+  imageUri?: string;
 }
 
 export interface LaunchTokenResult {
@@ -62,6 +65,7 @@ export function useRollupLaunchToken() {
       const ticker = payload.ticker.trim().toUpperCase();
       const name = payload.name.trim();
       const description = payload.description.trim();
+      const imageUri = (payload.imageUri ?? "").trim();
       const subdomain = `${ticker.toLowerCase()}.fun.init`;
       const maxSupply = (payload.maxSupply ?? DEFAULT_MAX_SUPPLY).replace(/[^0-9]/g, "");
 
@@ -99,6 +103,7 @@ export function useRollupLaunchToken() {
                 JSON.stringify(ticker),
                 JSON.stringify(name),
                 JSON.stringify(description),
+                JSON.stringify(imageUri),
               ],
             },
           },

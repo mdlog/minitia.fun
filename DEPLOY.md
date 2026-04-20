@@ -216,3 +216,30 @@ minitiad tx move execute <DEPLOYED_ADDR> liquidity_migrator initialize ...
 Pools, balances, promotion stages, and claimed-fee state on the old appchain
 do not carry over. Users re-launch on v2 under the same ticker if the name
 is still available. Announce the migration clearly before cutover.
+
+### Token logos via IPFS (Pinata)
+
+v2 also adds `image_uri: String` to `token_factory::TokenInfo` and the
+`TokenLaunched` event. Launchpad pins the logo on IPFS via Pinata before
+broadcasting `launch()`, and passes the resulting `ipfs://<cid>` as the
+5th arg.
+
+`.env.local`:
+```
+VITE_PINATA_JWT=<jwt from https://app.pinata.cloud/developers/api-keys>
+VITE_PINATA_GATEWAY=https://<your-subdomain>.mypinata.cloud
+```
+
+**Security note**: the JWT is baked into the client bundle. Anyone who
+inspects the JS can extract it and use it to pin on your account. This
+is acceptable for testnet and hackathon, but production should:
+
+1. Hide the JWT in a backend service.
+2. Expose `POST /upload-presigned` on that backend; call Pinata's
+   `POST /v3/files/sign` (short-lived presigned URLs) there.
+3. Client uploads directly to the presigned URL — JWT never leaves the
+   server, quota stays scoped per request.
+
+When `VITE_PINATA_JWT` is empty, Launchpad degrades gracefully: logo
+upload is skipped, tokens launch with `image_uri=""`, and the Avatar
+component falls back to the monogram tile.

@@ -110,7 +110,7 @@ export default function Airdrops() {
                 className="grid grid-cols-[minmax(180px,1.5fr)_1fr_1fr_1fr_auto] items-center gap-4 border-b border-white/[0.04] px-4 py-3 last:border-b-0 hover:bg-white/[0.02]"
               >
                 <div className="flex items-center gap-3">
-                  <Avatar symbol={t.ticker} size="sm" />
+                  <Avatar symbol={t.ticker} size="sm" src={t.imageUri} />
                   <div>
                     <div className="text-[13px] font-medium text-on-surface">${t.ticker}</div>
                     <div className="font-mono text-[11px] text-on-surface-muted">

@@ -21,12 +21,14 @@ import { useAppchainBalance } from "@/hooks/useAppchainBalance";
 import { useAppchainFaucet } from "@/hooks/useAppchainFaucet";
 import { useInitiaAccount } from "@/hooks/useInitiaAccount";
 import { useRollupLaunchToken, type LaunchTokenResult } from "@/hooks/useRollupLaunchToken";
+import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import {
   APPCHAIN,
   APPCHAIN_FAUCET_AVAILABLE,
   APPCHAIN_RPC_AVAILABLE,
 } from "@/lib/initia";
+import { PINATA_ENABLED, uploadToPinata } from "@/lib/pinata";
 
 const DRAFT_KEY = "minitia.launchpad_draft.v2";
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -66,13 +68,21 @@ export default function Launchpad() {
   const { launch, isPending } = useRollupLaunchToken();
   const balanceQuery = useAppchainBalance(initiaAddress);
   const { drip, isPending: isDripping } = useAppchainFaucet();
+  const toast = useToast();
   const initial = useMemo(loadDraft, []);
   const [name, setName] = useState(initial.name);
   const [ticker, setTicker] = useState(initial.ticker);
   const [desc, setDesc] = useState(initial.desc);
-  const [logo, setLogo] = useState<string>(initial.logo);
+  /** ipfs://<cid> of the uploaded logo — persisted in the draft so the user
+   *  can close the tab and come back without re-uploading. */
+  const [logoIpfsUri, setLogoIpfsUri] = useState<string>(initial.logo);
+  /** Transient File picked in the current session (pre-upload). */
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  /** Transient data URL for immediate preview before Pinata upload. */
+  const [logoPreview, setLogoPreview] = useState<string>("");
   const [maxSupply, setMaxSupply] = useState<string>(initial.maxSupply);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [lastResult, setLastResult] = useState<LaunchTokenResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -81,14 +91,20 @@ export default function Launchpad() {
       try {
         localStorage.setItem(
           DRAFT_KEY,
-          JSON.stringify({ name, ticker, desc, logo, maxSupply }),
+          JSON.stringify({
+            name,
+            ticker,
+            desc,
+            logo: logoIpfsUri,
+            maxSupply,
+          }),
         );
       } catch {
         /* ignore */
       }
     }, 400);
     return () => clearTimeout(t);
-  }, [name, ticker, desc, logo, maxSupply]);
+  }, [name, ticker, desc, logoIpfsUri, maxSupply]);
 
   const onPickLogo = () => {
     setLogoError(null);
@@ -113,20 +129,77 @@ export default function Launchpad() {
       reader.onerror = () => reject(reader.error ?? new Error("read failed"));
       reader.readAsDataURL(file);
     });
-    setLogo(dataUrl);
+    // New file overrides any previously pinned one; upload happens at deploy time.
+    setLogoFile(file);
+    setLogoPreview(dataUrl);
+    setLogoIpfsUri("");
   };
 
   const clearLogo = () => {
-    setLogo("");
+    setLogoFile(null);
+    setLogoPreview("");
+    setLogoIpfsUri("");
     setLogoError(null);
   };
 
+  const uploadLogo = async (): Promise<string> => {
+    if (!logoFile) return logoIpfsUri;
+    if (!PINATA_ENABLED) {
+      // Config missing: proceed without a logo but warn. Users can configure
+      // VITE_PINATA_JWT if they want images attached.
+      toast.push({
+        tone: "info",
+        title: "Logo skipped",
+        description: "Set VITE_PINATA_JWT to attach logos on launch.",
+      });
+      return "";
+    }
+    const uploadId = toast.push({
+      tone: "loading",
+      title: "Uploading logo to IPFS",
+      description: `${logoFile.name} · ${(logoFile.size / 1024).toFixed(0)} KB`,
+    });
+    setIsUploadingLogo(true);
+    try {
+      const result = await uploadToPinata(logoFile, {
+        name: `minitia.fun/${ticker.toUpperCase()}`,
+        keyvalues: { ticker: ticker.toUpperCase(), app: "minitia.fun" },
+      });
+      setLogoIpfsUri(result.ipfsUri);
+      toast.update(uploadId, {
+        tone: "success",
+        title: "Logo pinned",
+        description: `${result.cid.slice(0, 12)}… · ${(result.size / 1024).toFixed(0)} KB`,
+      });
+      return result.ipfsUri;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.update(uploadId, {
+        tone: "error",
+        title: "Logo upload failed",
+        description: msg.slice(0, 240),
+      });
+      throw err;
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   const onDeploy = async () => {
+    let imageUri = logoIpfsUri;
+    if (logoFile && !imageUri) {
+      try {
+        imageUri = await uploadLogo();
+      } catch {
+        return; // toast already surfaced the failure
+      }
+    }
     const result = await launch({
       name,
       ticker,
       description: desc,
       maxSupply: maxSupply || DEFAULT_MAX_SUPPLY,
+      imageUri,
     });
     if (result) {
       setLastResult(result);
@@ -138,7 +211,9 @@ export default function Launchpad() {
       setName("");
       setTicker("");
       setDesc("");
-      setLogo("");
+      setLogoFile(null);
+      setLogoPreview("");
+      setLogoIpfsUri("");
       setMaxSupply(DEFAULT_MAX_SUPPLY);
     }
   };
@@ -166,12 +241,19 @@ export default function Launchpad() {
               <button
                 type="button"
                 onClick={onPickLogo}
-                aria-label={logo ? "Replace logo" : "Upload logo"}
-                className="group flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg bg-[#0F0F11] ghost-border transition-colors hover:bg-white/[0.04]"
+                aria-label={logoPreview || logoIpfsUri ? "Replace logo" : "Upload logo"}
+                className="group relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg bg-[#0F0F11] ghost-border transition-colors hover:bg-white/[0.04]"
               >
-                {logo ? (
+                {logoPreview ? (
                   <img
-                    src={logo}
+                    src={logoPreview}
+                    alt="Token logo"
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                ) : logoIpfsUri ? (
+                  <img
+                    src={logoIpfsUri.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/")}
                     alt="Token logo"
                     className="h-full w-full object-cover"
                     draggable={false}
@@ -183,6 +265,11 @@ export default function Launchpad() {
                     <span className="text-[10px] text-[#3F3F46]">PNG · 512px · 2MB</span>
                   </div>
                 )}
+                {isUploadingLogo && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <Loader2 className="h-5 w-5 animate-spin text-white" />
+                  </div>
+                )}
               </button>
               <input
                 ref={fileRef}
@@ -192,11 +279,22 @@ export default function Launchpad() {
                 className="hidden"
                 aria-hidden
               />
-              {logo && (
+              {logoIpfsUri && (
+                <span className="truncate font-mono text-[10px] text-[#34D399]" title={logoIpfsUri}>
+                  pinned · {logoIpfsUri.slice(7, 17)}…
+                </span>
+              )}
+              {logoFile && !logoIpfsUri && (
+                <span className="truncate font-mono text-[10px] text-[#FBBF24]">
+                  {PINATA_ENABLED ? "will pin on deploy" : "pinata not configured"}
+                </span>
+              )}
+              {(logoFile || logoIpfsUri) && (
                 <button
                   type="button"
                   onClick={clearLogo}
-                  className="inline-flex items-center justify-center gap-1 rounded-md py-1 text-[11px] text-on-surface-variant hover:text-error"
+                  disabled={isUploadingLogo}
+                  className="inline-flex items-center justify-center gap-1 rounded-md py-1 text-[11px] text-on-surface-variant hover:text-error disabled:opacity-40"
                 >
                   <Trash2 className="h-3 w-3" />
                   Remove
@@ -274,9 +372,12 @@ export default function Launchpad() {
               </Chip>
             </div>
             <div className="flex items-center gap-3 rounded-lg bg-[#0A0A0C] p-4 ghost-border">
-              {logo ? (
+              {logoPreview || logoIpfsUri ? (
                 <img
-                  src={logo}
+                  src={
+                    logoPreview ||
+                    logoIpfsUri.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/")
+                  }
                   alt={`${ticker || "token"} logo`}
                   className="h-11 w-11 shrink-0 rounded-md object-cover ghost-border"
                   draggable={false}
@@ -327,9 +428,11 @@ export default function Launchpad() {
                 variant={ready ? "primary" : "neutral"}
                 size="lg"
                 fullWidth
-                disabled={!ready || isPending || !APPCHAIN_RPC_AVAILABLE}
+                disabled={
+                  !ready || isPending || isUploadingLogo || !APPCHAIN_RPC_AVAILABLE
+                }
                 leading={
-                  isPending ? (
+                  isPending || isUploadingLogo ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <Rocket className="h-3.5 w-3.5" />
@@ -337,13 +440,15 @@ export default function Launchpad() {
                 }
                 onClick={onDeploy}
               >
-                {isPending
-                  ? "Broadcasting…"
-                  : !APPCHAIN_RPC_AVAILABLE
-                    ? "Rollup RPC not configured"
-                    : ready
-                      ? "Deploy token"
-                      : "Complete all fields"}
+                {isUploadingLogo
+                  ? "Pinning logo…"
+                  : isPending
+                    ? "Broadcasting…"
+                    : !APPCHAIN_RPC_AVAILABLE
+                      ? "Rollup RPC not configured"
+                      : ready
+                        ? "Deploy token"
+                        : "Complete all fields"}
               </Button>
             ) : (
               <Button

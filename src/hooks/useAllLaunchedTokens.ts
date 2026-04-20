@@ -6,6 +6,8 @@ export interface LaunchedToken {
   name: string;
   creator: string;
   subdomain: string;
+  /** ipfs://<cid> or https://… . Empty string if the launcher skipped logo. */
+  imageUri: string;
   launchIndex: number;
   launchHash: string;
   launchHeight: number;
@@ -13,6 +15,7 @@ export interface LaunchedToken {
   poolExists: boolean;
   initReserve: bigint;
   tokenSupply: bigint;
+  maxSupply: bigint;
   basePrice: bigint;
   slope: bigint;
   feeAccumulated: bigint;
@@ -71,6 +74,7 @@ async function fetchPoolForTicker(ticker: string) {
       poolExists: false,
       initReserve: 0n,
       tokenSupply: 0n,
+      maxSupply: 0n,
       basePrice: 0n,
       slope: 0n,
       feeAccumulated: 0n,
@@ -85,6 +89,7 @@ async function fetchPoolForTicker(ticker: string) {
       poolExists: true,
       initReserve: 0n,
       tokenSupply: 0n,
+      maxSupply: 0n,
       basePrice: 0n,
       slope: 0n,
       feeAccumulated: 0n,
@@ -93,12 +98,17 @@ async function fetchPoolForTicker(ticker: string) {
       spotPrice: 0n,
     };
   }
-  const [reserve, supply, base, slope, fee, count, graduated] = tuple.map((s) => BigInt(s));
+  const [reserve, supply, base, slope, fee, count, graduated] = tuple
+    .slice(0, 7)
+    .map((s) => BigInt(s));
+  // v2 appends max_supply at index 7; v1 tuples of length 7 fall back to 0n.
+  const maxSupply = tuple.length > 7 ? BigInt(tuple[7]) : 0n;
   const spot = base + (supply * slope) / 1_000_000n;
   return {
     poolExists: true,
     initReserve: reserve,
     tokenSupply: supply,
+    maxSupply,
     basePrice: base,
     slope,
     feeAccumulated: fee,
@@ -153,6 +163,7 @@ async function fetchLaunched(limit: number): Promise<LaunchedToken[]> {
         name: data.name ?? ticker,
         creator: data.creator ?? "",
         subdomain: data.subdomain ?? `${ticker}.fun.init`,
+        imageUri: data.image_uri ?? "",
         launchIndex: Number(data.launch_index ?? 0),
         launchHash: tx.hash ?? "",
         launchHeight: Number(tx.height ?? 0),

@@ -174,7 +174,7 @@ export default function Discovery() {
                     <span className="w-5 font-mono text-[11px] tabular-nums text-[#52525B]">
                       {String(t.launchIndex || i + 1).padStart(2, "0")}
                     </span>
-                    <Avatar symbol={t.ticker} size="sm" />
+                    <Avatar symbol={t.ticker} size="sm" src={t.imageUri} />
                     <div className="flex min-w-0 flex-col">
                       <span className="truncate text-[13px] font-medium text-on-surface">
                         {t.name}

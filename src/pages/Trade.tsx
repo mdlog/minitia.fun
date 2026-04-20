@@ -87,10 +87,12 @@ export default function Trade() {
   const { isConnected, openConnect, initiaAddress, hexAddress } = useInitiaAccount();
   const pool = usePoolState(ticker);
   const tokensIndex = useAllLaunchedTokens(50);
-  const launcherAddr = useMemo(
-    () => tokensIndex.data?.find((t) => t.ticker === ticker)?.creator ?? "",
+  const tokenMeta = useMemo(
+    () => tokensIndex.data?.find((t) => t.ticker === ticker),
     [tokensIndex.data, ticker],
   );
+  const launcherAddr = tokenMeta?.creator ?? "";
+  const tokenImage = tokenMeta?.imageUri ?? "";
   const isLauncher = useMemo(
     () => Boolean(hexAddress && launcherAddr && addrEq(launcherAddr, hexAddress)),
     [hexAddress, launcherAddr],
@@ -227,7 +229,7 @@ export default function Trade() {
       <Card padded="md">
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center gap-3">
-            <Avatar symbol={ticker} size="lg" />
+            <Avatar symbol={ticker} size="lg" src={tokenImage} />
             <div>
               <div className="flex items-baseline gap-2">
                 <span className="text-[17px] font-semibold tracking-tight text-on-surface">

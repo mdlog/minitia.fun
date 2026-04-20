@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { resolveImageUri } from "@/lib/pinata";
 
 export interface AvatarProps {
   symbol: string;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   variant?: "gradient-1" | "gradient-2" | "gradient-3" | "auto";
+  /** Optional ipfs://, https:// or data: URI to render in place of the monogram. */
+  src?: string | null;
   className?: string;
 }
 
@@ -30,8 +34,28 @@ function hash(s: string): number {
   return Math.abs(h);
 }
 
-export function Avatar({ symbol, size = "md", className }: AvatarProps) {
+export function Avatar({ symbol, size = "md", src, className }: AvatarProps) {
+  const [broken, setBroken] = useState(false);
+  const resolved = broken ? null : resolveImageUri(src);
   const sw = SWATCHES[hash(symbol) % SWATCHES.length];
+
+  if (resolved) {
+    return (
+      <img
+        src={resolved}
+        alt={symbol}
+        className={cn(
+          "flex shrink-0 rounded-md object-cover ghost-border",
+          sizeMap[size],
+          className,
+        )}
+        loading="lazy"
+        draggable={false}
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+
   return (
     <div
       className={cn(

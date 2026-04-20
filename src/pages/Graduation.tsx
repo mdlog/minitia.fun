@@ -140,7 +140,7 @@ export default function Graduation() {
       <div className="flex flex-col gap-4 pb-8">
         <Card padded="lg" className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Avatar symbol={ticker} size="lg" />
+            <Avatar symbol={ticker} size="lg" src={tokenMeta?.imageUri} />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-3">
                 <h1 className="text-[24px] font-semibold tracking-tight text-on-surface">

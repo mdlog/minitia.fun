@@ -35,6 +35,13 @@ module minitia_fun::bonding_curve {
     const E_NO_FEES: u64 = 10;
     const E_CUSTODY_NOT_INITIALIZED: u64 = 11;
     const E_AMOUNT_TOO_LARGE: u64 = 12;
+    /// Ticker not registered via token_factory::launch. Pools can only open
+    /// for officially launched tokens.
+    const E_TICKER_NOT_LAUNCHED: u64 = 13;
+    /// Caller is not the wallet that ran token_factory::launch for this
+    /// ticker. Prevents outside wallets from silently capturing pool-creator
+    /// rights (trading fees, appchain promotion).
+    const E_NOT_LAUNCHER: u64 = 14;
 
     // ---- Seeds -------------------------------------------------------------
     const VAULT_SEED: vector<u8> = b"minitia_fun::bonding_curve::vault::v1";
@@ -149,8 +156,16 @@ module minitia_fun::bonding_curve {
 
     // ---- Entry: pool lifecycle --------------------------------------------
 
-    /// Create a pool for a ticker. Anyone can call - the curve is permissionless.
-    /// Default linear params: base=1_000 (0.001 INIT) and slope=10 (0.00001 INIT per unit supply).
+    /// Create a pool for a ticker. Gated to the token's original launcher so
+    /// trading fees and appchain promotion rights stay with the creator.
+    /// Two invariants enforced:
+    ///   1. Ticker MUST already exist in token_factory::Registry
+    ///      (i.e. someone ran token_factory::launch).
+    ///   2. Caller MUST be the launcher recorded there.
+    /// Combined with the Launchpad bundling `launch + create_pool` in a
+    /// single tx, this guarantees `pool.creator == token_factory.creator`
+    /// for all new pools.
+    /// Default linear params: base=1_000 (0.001 INIT) and slope=10.
     public entry fun create_pool(
         creator: &signer,
         registry_addr: address,
@@ -159,10 +174,23 @@ module minitia_fun::bonding_curve {
         slope: u128,
     ) acquires Registry {
         assert!(exists<Registry>(registry_addr), error::not_found(E_NOT_INITIALIZED));
+
+        let creator_addr = signer::address_of(creator);
+
+        // Cross-module gate: caller must own the ticker in token_factory.
+        // Both modules share the same registry_addr (module owner's account),
+        // so no extra parameter is required on the entry function and
+        // existing client callers remain compatible.
+        assert!(
+            minitia_fun::token_factory::ticker_registered(registry_addr, ticker),
+            error::not_found(E_TICKER_NOT_LAUNCHED)
+        );
+        let launcher = minitia_fun::token_factory::launcher_of(registry_addr, ticker);
+        assert!(launcher == creator_addr, error::permission_denied(E_NOT_LAUNCHER));
+
         let registry = borrow_global_mut<Registry>(registry_addr);
         assert!(!table::contains(&registry.pools, ticker), error::already_exists(E_POOL_EXISTS));
 
-        let creator_addr = signer::address_of(creator);
         let pool = Pool {
             ticker,
             creator: creator_addr,

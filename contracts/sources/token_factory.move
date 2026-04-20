@@ -149,6 +149,24 @@ module minitia_fun::token_factory {
         *table::borrow(&registry.tokens, ticker)
     }
 
+    /// True if a ticker has been registered via `launch`. Used by
+    /// bonding_curve::create_pool to gate pool creation to known tokens.
+    #[view]
+    public fun ticker_registered(registry_addr: address, ticker: String): bool acquires Registry {
+        if (!exists<Registry>(registry_addr)) { return false };
+        table::contains(&borrow_global<Registry>(registry_addr).tokens, ticker)
+    }
+
+    /// Wallet that registered the ticker via `launch`. Aborts if the ticker
+    /// is not registered. Used by bonding_curve::create_pool to require that
+    /// only the original launcher can open the curve (preventing pool-creator
+    /// capture by a passerby).
+    #[view]
+    public fun launcher_of(registry_addr: address, ticker: String): address acquires Registry {
+        let registry = borrow_global<Registry>(registry_addr);
+        table::borrow(&registry.tokens, ticker).creator
+    }
+
     // ---- Internal ----------------------------------------------------------
 
     fun assert_valid_ticker(ticker: &String) {

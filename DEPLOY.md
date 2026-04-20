@@ -118,3 +118,35 @@ field passes the validation rules:
 - `core_logic_path` + `native_feature_frontend_path`: both resolve at `commit_sha`
 
 Push the final commit. You're done.
+
+## Upgrading the Move package
+
+Compatible upgrades preserve the existing `Registry` state (token list,
+pools, balances, vault custody) — new entry functions and new constants
+are fine, struct field additions/removals are not.
+
+```bash
+cd contracts
+minitiad move build
+minitiad move deploy \
+  --from gas-station \
+  --chain-id minitia-fun-test-1 \
+  --keyring-backend test \
+  --node http://localhost:26657 \
+  --upgrade-policy compatible
+```
+
+### Pool-creator guard upgrade (commit <FILL IN AFTER COMMIT>)
+
+`bonding_curve::create_pool` now requires `caller == token_factory::launcher_of(ticker)`.
+Effects:
+- New pools can only be opened by the wallet that ran `token_factory::launch`
+  for that ticker. Launchpad already bundles both calls in one tx, so the
+  happy path is unchanged.
+- Existing pools are untouched — the upgrade does not rewrite `pool.creator`
+  for tokens where the launcher and pool creator had already diverged.
+  Those tokens keep their historical split; the pool creator remains the
+  fee claimer and promotion gatekeeper.
+- Entry signatures are unchanged. No client-side migration needed.
+
+Abort codes added: `E_TICKER_NOT_LAUNCHED = 13`, `E_NOT_LAUNCHER = 14`.

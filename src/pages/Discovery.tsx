@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, ArrowUpRight, Rocket, Trophy } from "lucide-react";
+import { ArrowUpRight, Rocket } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -218,39 +218,6 @@ export default function Discovery() {
         )}
       </section>
 
-      {/* Protocol architecture */}
-      <section className="grid gap-4 md:grid-cols-3">
-        {[
-          {
-            icon: Rocket,
-            title: "Launch",
-            desc: "Mint a token in seconds. Metadata, ticker, curve — ready to trade.",
-          },
-          {
-            icon: Activity,
-            title: "Trade",
-            desc: "100ms blocks, auto-signed. Bonding curve to 5k INIT milestone.",
-          },
-          {
-            icon: Trophy,
-            title: "Graduate",
-            desc: "Migrate liquidity to InitiaDEX. Promote to a sovereign L2.",
-          },
-        ].map((step) => {
-          const Icon = step.icon;
-          return (
-            <Card key={step.title} padded="md" className="flex flex-col gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white/[0.04] text-[#60A5FA]">
-                <Icon className="h-4 w-4" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[13.5px] font-semibold text-on-surface">{step.title}</span>
-                <p className="text-[12.5px] leading-[1.55] text-on-surface-variant">{step.desc}</p>
-              </div>
-            </Card>
-          );
-        })}
-      </section>
 
     </div>
   );

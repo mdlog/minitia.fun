@@ -115,6 +115,24 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
               >
                 raw /status <ArrowUpRight className="h-3 w-3" />
               </a>
+              <a
+                href="https://celat.one"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-full bg-editorial/15 px-3 py-1.5 text-editorial ghost-border hover:bg-editorial/25"
+                title="Third-party Move-aware explorer (Celatone by Alleslabs) — independent verification of module ABIs, view functions, and resource state"
+              >
+                advanced · celat.one <ArrowUpRight className="h-3 w-3" />
+              </a>
+              <a
+                href="https://scan.testnet.initia.xyz/initiation-2"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-3 py-1.5 ghost-border hover:text-editorial-ink"
+                title="Initia L1 testnet explorer (initiation-2) — settlement layer for this rollup"
+              >
+                L1 scan <ArrowUpRight className="h-3 w-3" />
+              </a>
             </div>
           </div>
         </footer>

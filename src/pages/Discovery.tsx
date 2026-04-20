@@ -93,7 +93,9 @@ export default function Discovery() {
           <div className="grid grid-cols-2 gap-x-3 gap-y-4">
             <Stat
               label="Chain"
-              value={network.data?.chainId ?? "—"}
+              value={
+                <span className="text-[13px]">{network.data?.chainId ?? "—"}</span>
+              }
               tone="info"
             />
             <Stat

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, ArrowUpRight, ExternalLink, Rocket, Trophy } from "lucide-react";
+import { Activity, ArrowUpRight, Rocket, Trophy } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -17,7 +17,6 @@ import {
   graduationProgress,
   type LaunchedToken,
 } from "@/hooks/useAllLaunchedTokens";
-import { APPCHAIN } from "@/lib/initia";
 import { formatNumber } from "@/lib/format";
 
 type FilterKey = "All" | "Trading" | "Graduated" | "No pool";
@@ -253,53 +252,6 @@ export default function Discovery() {
         })}
       </section>
 
-      {/* Rollup live panel (kept, cleaner) */}
-      {network.data && (
-        <Card padded="lg" className="flex flex-col gap-5">
-          <SectionHeader
-            title="Our rollup, live"
-            description="Direct observability on the Minitia appchain."
-            action={
-              <Chip tone={liveOnRollup ? "success" : "neutral"} dot>
-                {liveOnRollup ? "Live" : network.data.source}
-              </Chip>
-            }
-          />
-          <div className="grid gap-6 md:grid-cols-4">
-            <Stat label="Chain" value={network.data.chainId} tone="info" />
-            <Stat label="Block height" value={`#${formatNumber(network.data.blockHeight)}`} />
-            <Stat
-              label="Tokens launched"
-              value={stats.data?.enabled ? formatNumber(stats.data.launchesOnChain) : "—"}
-              tone="success"
-            />
-            <Stat
-              label="Move txs"
-              value={stats.data?.enabled ? formatNumber(stats.data.msgExecuteCount) : "—"}
-            />
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.05] pt-4">
-            <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-on-surface-muted">
-                token_factory module
-              </span>
-              <code className="truncate font-mono text-[12px] text-on-surface-variant">
-                {APPCHAIN.deployedAddress}
-              </code>
-            </div>
-            {APPCHAIN.rpc && (
-              <a
-                href={`${APPCHAIN.rpc}/status`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-[11px] text-secondary hover:text-on-surface"
-              >
-                Verify on RPC <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

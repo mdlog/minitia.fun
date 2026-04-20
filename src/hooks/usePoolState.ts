@@ -136,3 +136,30 @@ export function useUserHolding(holderHex: string | undefined, ticker: string, po
     retry: 1,
   });
 }
+
+/**
+ * Wallet that called bonding_curve::create_pool for the given ticker.
+ * This is the address the liquidity_migrator contract checks for
+ * stage_promotion / record_rollup (NOT the token_factory launcher).
+ */
+async function fetchPoolCreator(ticker: string): Promise<string | undefined> {
+  if (!APPCHAIN_RPC_AVAILABLE || !ticker) return undefined;
+  const result = await moveView<string>(
+    APPCHAIN.deployedAddress,
+    "bonding_curve",
+    "creator_of",
+    [`"${APPCHAIN.deployedAddress}"`, JSON.stringify(ticker)],
+  );
+  return result;
+}
+
+export function usePoolCreator(ticker: string, pollMs = 30_000) {
+  return useQuery({
+    queryKey: ["poolCreator", APPCHAIN.rest, ticker],
+    queryFn: () => fetchPoolCreator(ticker),
+    enabled: APPCHAIN_RPC_AVAILABLE && Boolean(ticker),
+    refetchInterval: pollMs,
+    staleTime: 20_000,
+    retry: 1,
+  });
+}

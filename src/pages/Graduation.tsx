@@ -25,7 +25,7 @@ import { useClaimFeesAction } from "@/hooks/useClaimFeesAction";
 import { useGraduationEvent } from "@/hooks/useGraduationEvent";
 import { useHolderLeaderboard } from "@/hooks/useHolderLeaderboard";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { usePoolState } from "@/hooks/usePoolState";
+import { usePoolCreator, usePoolState } from "@/hooks/usePoolState";
 import {
   usePromotionStage,
   useRecordRollupAction,
@@ -72,6 +72,7 @@ export default function Graduation() {
   const holders = useHolderLeaderboard(ticker, 10);
   const network = useNetworkStatus();
   const tokens = useAllLaunchedTokens(50);
+  const poolCreator = usePoolCreator(ticker);
   const { claim, isPending: isClaiming } = useClaimFeesAction();
   const promotion = usePromotionStage(ticker);
   const { stage: stagePromotion, isPending: isStaging } = useStagePromotionAction();
@@ -85,9 +86,15 @@ export default function Graduation() {
     () => (tokens.data ?? []).find((t) => t.ticker === ticker),
     [tokens.data, ticker],
   );
+  // IMPORTANT: the on-chain check uses bonding_curve::creator_of (whoever
+  // called create_pool), not token_factory::launch. These two CAN differ
+  // — anyone can open a curve for a ticker someone else launched. Compare
+  // against the pool creator to avoid flashing a Stage button that will
+  // revert with E_NOT_CREATOR (0x50008).
   const isCreator = useMemo(
-    () => Boolean(hexAddress && tokenMeta?.creator && addrEq(tokenMeta.creator, hexAddress)),
-    [hexAddress, tokenMeta],
+    () =>
+      Boolean(hexAddress && poolCreator.data && addrEq(poolCreator.data, hexAddress)),
+    [hexAddress, poolCreator.data],
   );
 
   const latestHeight = network.data?.blockHeight ?? 0;
@@ -430,9 +437,20 @@ export default function Graduation() {
                 {isStaging ? "Staging…" : "Stage promotion"}
               </Button>
             ) : (
-              <span className="text-[11px] font-medium text-on-surface-muted">
-                only pool creator can stage
-              </span>
+              <div className="flex flex-col items-end gap-0.5 text-[11px]">
+                <span className="font-medium text-on-surface-muted">
+                  Only pool creator can stage
+                </span>
+                {poolCreator.data && (
+                  <Link
+                    to={`/u/${poolCreator.data}`}
+                    className="font-mono text-[#60A5FA] hover:text-on-surface"
+                    title={poolCreator.data}
+                  >
+                    {shortAddr(poolCreator.data)}
+                  </Link>
+                )}
+              </div>
             )}
           </div>
         )}

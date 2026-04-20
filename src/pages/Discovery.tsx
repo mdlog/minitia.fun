@@ -67,10 +67,10 @@ export default function Discovery() {
             <Chip tone={liveOnRollup ? "success" : "info"} dot>
               {liveOnRollup ? "Appchain healthy" : "Protocol stable"}
             </Chip>
-            <h1 className="text-[30px] font-semibold leading-[1.1] tracking-tight text-on-surface">
+            <h1 className="text-[20px] font-semibold leading-[1.15] tracking-tight text-on-surface">
               Launch anything. <span className="text-on-surface-muted">Graduate fast.</span>
             </h1>
-            <p className="text-[13.5px] leading-[1.55] text-on-surface-variant">
+            <p className="text-[12px] leading-[1.55] text-on-surface-variant">
               A sovereign launchpad on Initia. Deploy a token, trade on-curve, then promote to its
               own appchain — in a single cockpit.
             </p>

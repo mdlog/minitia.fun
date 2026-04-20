@@ -118,23 +118,35 @@ async function fetchPoolForTicker(ticker: string) {
   };
 }
 
+type TxRow = {
+  hash?: string;
+  height?: string;
+  tx_result?: { code?: number; events?: MoveEvent[] };
+};
+
+async function fetchTxsByAction(action: string, limit: number): Promise<TxRow[]> {
+  const query = encodeURIComponent(`"message.action='${action}'"`);
+  const url = `${APPCHAIN.rpc}/tx_search?query=${query}&per_page=${limit}&order_by=%22desc%22`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) return [];
+  const json = (await res.json()) as { result?: { txs?: TxRow[] } };
+  return json.result?.txs ?? [];
+}
+
 async function fetchLaunched(limit: number): Promise<LaunchedToken[]> {
   if (!APPCHAIN_RPC_AVAILABLE) return [];
 
-  const query = encodeURIComponent(`"message.action='/initia.move.v1.MsgExecuteJSON'"`);
-  const url = `${APPCHAIN.rpc}/tx_search?query=${query}&per_page=${limit * 4}&order_by=%22desc%22`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) return [];
-  const json = (await res.json()) as {
-    result?: {
-      txs?: Array<{
-        hash?: string;
-        height?: string;
-        tx_result?: { code?: number; events?: MoveEvent[] };
-      }>;
-    };
-  };
-  const txs = json.result?.txs ?? [];
+  // Two query flavours: direct MsgExecuteJSON (wallet signs each tx) and
+  // MsgExec wrapped via authz (auto-sign / session keys). CometBFT's
+  // tx_search doesn't OR, so query both and merge.
+  const perPage = limit * 4;
+  const [direct, wrapped] = await Promise.all([
+    fetchTxsByAction("/initia.move.v1.MsgExecuteJSON", perPage),
+    fetchTxsByAction("/cosmos.authz.v1beta1.MsgExec", perPage),
+  ]);
+  const txs = [...direct, ...wrapped].sort(
+    (a, b) => Number(b.height ?? 0) - Number(a.height ?? 0),
+  );
 
   const seen = new Set<string>();
   const launches: Array<Omit<LaunchedToken, keyof Awaited<ReturnType<typeof fetchPoolForTicker>>>> = [];

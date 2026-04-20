@@ -26,22 +26,30 @@ interface MoveEvent {
  *  Source of truth is `bonding_curve::Trade.new_holder_balance` which is
  *  emitted for every buy/sell, so we can derive the LATEST balance per
  *  trader without re-summing tokens. */
-async function fetchLeaderboard(ticker: string, limit: number): Promise<HolderRow[]> {
-  if (!APPCHAIN_RPC_AVAILABLE || !ticker) return [];
-  const query = encodeURIComponent(`"message.action='/initia.move.v1.MsgExecuteJSON'"`);
+type TxRow = {
+  hash?: string;
+  height?: string;
+  tx_result?: { code?: number; events?: MoveEvent[] };
+};
+
+async function fetchByAction(action: string): Promise<TxRow[]> {
+  const query = encodeURIComponent(`"message.action='${action}'"`);
   const url = `${APPCHAIN.rpc}/tx_search?query=${query}&per_page=200&order_by=%22desc%22`;
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) return [];
-  const json = (await res.json()) as {
-    result?: {
-      txs?: Array<{
-        hash?: string;
-        height?: string;
-        tx_result?: { code?: number; events?: MoveEvent[] };
-      }>;
-    };
-  };
-  const txs = json.result?.txs ?? [];
+  const json = (await res.json()) as { result?: { txs?: TxRow[] } };
+  return json.result?.txs ?? [];
+}
+
+async function fetchLeaderboard(ticker: string, limit: number): Promise<HolderRow[]> {
+  if (!APPCHAIN_RPC_AVAILABLE || !ticker) return [];
+  const [direct, wrapped] = await Promise.all([
+    fetchByAction("/initia.move.v1.MsgExecuteJSON"),
+    fetchByAction("/cosmos.authz.v1beta1.MsgExec"),
+  ]);
+  const txs = [...direct, ...wrapped].sort(
+    (a, b) => Number(b.height ?? 0) - Number(a.height ?? 0),
+  );
   const seen = new Map<string, HolderRow>();
   // Iterate newest → oldest. First Trade event per trader gives current balance.
   for (const tx of txs) {

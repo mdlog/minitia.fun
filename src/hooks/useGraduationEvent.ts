@@ -18,23 +18,33 @@ interface MoveEvent {
   attributes?: MoveEventAttr[];
 }
 
-async function fetchGraduationEvent(ticker: string): Promise<GraduationEvent | null> {
-  if (!APPCHAIN_RPC_AVAILABLE || !ticker) return null;
-  const query = encodeURIComponent(`"message.action='/initia.move.v1.MsgExecuteJSON'"`);
+type TxRow = {
+  hash?: string;
+  height?: string;
+  tx_result?: { code?: number; events?: MoveEvent[] };
+};
+
+async function fetchByAction(action: string): Promise<TxRow[]> {
+  const query = encodeURIComponent(`"message.action='${action}'"`);
   const url = `${APPCHAIN.rpc}/tx_search?query=${query}&per_page=200&order_by=%22desc%22`;
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) return null;
-  const json = (await res.json()) as {
-    result?: {
-      txs?: Array<{
-        hash?: string;
-        height?: string;
-        tx_result?: { code?: number; events?: MoveEvent[] };
-      }>;
-    };
-  };
+  if (!res.ok) return [];
+  const json = (await res.json()) as { result?: { txs?: TxRow[] } };
+  return json.result?.txs ?? [];
+}
+
+async function fetchGraduationEvent(ticker: string): Promise<GraduationEvent | null> {
+  if (!APPCHAIN_RPC_AVAILABLE || !ticker) return null;
+  // Direct MsgExecuteJSON + authz MsgExec (auto-sign wrapper).
+  const [direct, wrapped] = await Promise.all([
+    fetchByAction("/initia.move.v1.MsgExecuteJSON"),
+    fetchByAction("/cosmos.authz.v1beta1.MsgExec"),
+  ]);
+  const txs = [...direct, ...wrapped].sort(
+    (a, b) => Number(b.height ?? 0) - Number(a.height ?? 0),
+  );
   const upper = ticker.toUpperCase();
-  for (const tx of json.result?.txs ?? []) {
+  for (const tx of txs) {
     if ((tx.tx_result?.code ?? 1) !== 0) continue;
     for (const ev of tx.tx_result?.events ?? []) {
       if (ev.type !== "move") continue;

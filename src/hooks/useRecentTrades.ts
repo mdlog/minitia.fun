@@ -48,25 +48,32 @@ function parseTrade(eventAttrs: Record<string, string>, hash: string, height: nu
   };
 }
 
-async function fetchTrades(ticker: string | undefined, limit: number): Promise<TradeEvent[]> {
-  if (!APPCHAIN_RPC_AVAILABLE) return [];
-  // tx_search: any MsgExecute against bonding_curve module on our deployed address.
-  // Ideal would be to filter by event attribute, but cometbft only indexes
-  // tx-level events with index=true. We filter in JS.
-  const query = encodeURIComponent(`"message.action='/initia.move.v1.MsgExecuteJSON'"`);
-  const url = `${APPCHAIN.rpc}/tx_search?query=${query}&per_page=${limit * 4}&order_by=%22desc%22`;
+type TxRow = {
+  hash?: string;
+  height?: string;
+  tx_result?: { code?: number; events?: MoveEvent[] };
+};
+
+async function fetchByAction(action: string, perPage: number): Promise<TxRow[]> {
+  const query = encodeURIComponent(`"message.action='${action}'"`);
+  const url = `${APPCHAIN.rpc}/tx_search?query=${query}&per_page=${perPage}&order_by=%22desc%22`;
   const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
   if (!res.ok) return [];
-  const json = (await res.json()) as {
-    result?: {
-      txs?: Array<{
-        hash?: string;
-        height?: string;
-        tx_result?: { code?: number; events?: MoveEvent[] };
-      }>;
-    };
-  };
-  const txs = json.result?.txs ?? [];
+  const json = (await res.json()) as { result?: { txs?: TxRow[] } };
+  return json.result?.txs ?? [];
+}
+
+async function fetchTrades(ticker: string | undefined, limit: number): Promise<TradeEvent[]> {
+  if (!APPCHAIN_RPC_AVAILABLE) return [];
+  // Direct MsgExecuteJSON (wallet signs each tx) + authz MsgExec (auto-sign).
+  const perPage = limit * 4;
+  const [direct, wrapped] = await Promise.all([
+    fetchByAction("/initia.move.v1.MsgExecuteJSON", perPage),
+    fetchByAction("/cosmos.authz.v1beta1.MsgExec", perPage),
+  ]);
+  const txs = [...direct, ...wrapped].sort(
+    (a, b) => Number(b.height ?? 0) - Number(a.height ?? 0),
+  );
   const trades: TradeEvent[] = [];
   for (const tx of txs) {
     if ((tx.tx_result?.code ?? 1) !== 0) continue;

@@ -16,7 +16,11 @@
  * upload URL reaches the browser.
  */
 
-const PIN_FILE_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS";
+// V3 upload endpoint — returns a CID that points DIRECTLY to the file.
+// The legacy V2 /pinning/pinFileToIPFS wraps the file in a directory by
+// default (mime_type: directory), which breaks <img src="ipfs://cid"> because
+// Pinata gateways refuse to render directory listings as HTML.
+const PIN_FILE_URL = "https://uploads.pinata.cloud/v3/files";
 
 export interface PinataConfig {
   jwt: string;
@@ -44,10 +48,15 @@ export interface UploadResult {
   size: number;
 }
 
-interface PinataResponse {
-  IpfsHash: string;
-  PinSize: number;
-  Timestamp?: string;
+interface PinataV3Response {
+  data?: {
+    id?: string;
+    cid?: string;
+    size?: number;
+    mime_type?: string;
+    number_of_files?: number;
+  };
+  error?: { reason?: string; details?: string };
 }
 
 export async function uploadToPinata(
@@ -62,15 +71,18 @@ export async function uploadToPinata(
   }
 
   const form = new FormData();
+  // V3 accepts `file`, `network` (public|private), `name`, `keyvalues` as
+  // separate form fields. `network=public` is required — default is
+  // `private`, which pins to Pinata's private storage that the public
+  // gateway refuses to serve.
   form.append("file", file, file.name);
-  if (opts?.name) {
-    form.append(
-      "pinataMetadata",
-      JSON.stringify({ name: opts.name, keyvalues: opts.keyvalues ?? {} }),
-    );
+  form.append("network", "public");
+  if (opts?.name) form.append("name", opts.name);
+  if (opts?.keyvalues) {
+    for (const [k, v] of Object.entries(opts.keyvalues)) {
+      form.append(`keyvalues[${k}]`, v);
+    }
   }
-  // Pin as CIDv1 (base32) for a URL-friendly CID; Pinata accepts the override.
-  form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
 
   const res = await fetch(PIN_FILE_URL, {
     method: "POST",
@@ -90,16 +102,19 @@ export async function uploadToPinata(
     throw new Error(`Pinata upload failed · ${detail}`);
   }
 
-  const json = (await res.json()) as PinataResponse;
-  if (!json.IpfsHash) {
-    throw new Error("Pinata upload returned no CID");
+  const json = (await res.json()) as PinataV3Response;
+  const cid = json.data?.cid;
+  if (!cid) {
+    throw new Error(
+      `Pinata upload returned no CID · ${json.error?.reason ?? "unknown"}`,
+    );
   }
 
   return {
-    cid: json.IpfsHash,
-    ipfsUri: `ipfs://${json.IpfsHash}`,
-    gatewayUrl: `${cfg.gateway}/ipfs/${json.IpfsHash}`,
-    size: json.PinSize ?? 0,
+    cid,
+    ipfsUri: `ipfs://${cid}`,
+    gatewayUrl: `${cfg.gateway}/ipfs/${cid}`,
+    size: json.data?.size ?? 0,
   };
 }
 

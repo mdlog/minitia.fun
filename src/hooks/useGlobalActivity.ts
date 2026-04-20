@@ -82,22 +82,32 @@ function parseEvent(type_tag: string, data: Record<string, unknown>, hash: strin
   return null;
 }
 
-async function fetchActivity(limit: number): Promise<ActivityEvent[]> {
-  if (!APPCHAIN_RPC_AVAILABLE) return [];
-  const query = encodeURIComponent(`"message.action='/initia.move.v1.MsgExecuteJSON'"`);
-  const url = `${APPCHAIN.rpc}/tx_search?query=${query}&per_page=${Math.max(50, limit * 3)}&order_by=%22desc%22`;
+type TxRow = {
+  hash?: string;
+  height?: string;
+  tx_result?: { code?: number; events?: MoveEvent[] };
+};
+
+async function fetchByAction(action: string, perPage: number): Promise<TxRow[]> {
+  const query = encodeURIComponent(`"message.action='${action}'"`);
+  const url = `${APPCHAIN.rpc}/tx_search?query=${query}&per_page=${perPage}&order_by=%22desc%22`;
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) return [];
-  const json = (await res.json()) as {
-    result?: {
-      txs?: Array<{
-        hash?: string;
-        height?: string;
-        tx_result?: { code?: number; events?: MoveEvent[] };
-      }>;
-    };
-  };
-  const txs = json.result?.txs ?? [];
+  const json = (await res.json()) as { result?: { txs?: TxRow[] } };
+  return json.result?.txs ?? [];
+}
+
+async function fetchActivity(limit: number): Promise<ActivityEvent[]> {
+  if (!APPCHAIN_RPC_AVAILABLE) return [];
+  const perPage = Math.max(50, limit * 3);
+  // Direct MsgExecuteJSON (wallet signs each tx) + authz MsgExec (auto-sign).
+  const [direct, wrapped] = await Promise.all([
+    fetchByAction("/initia.move.v1.MsgExecuteJSON", perPage),
+    fetchByAction("/cosmos.authz.v1beta1.MsgExec", perPage),
+  ]);
+  const txs = [...direct, ...wrapped].sort(
+    (a, b) => Number(b.height ?? 0) - Number(a.height ?? 0),
+  );
   const out: ActivityEvent[] = [];
   for (const tx of txs) {
     if ((tx.tx_result?.code ?? 1) !== 0) continue;

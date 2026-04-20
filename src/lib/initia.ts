@@ -70,7 +70,7 @@ export interface AppchainChainConfig {
 }
 
 export const APPCHAIN = {
-  chainId: "minitia-fun-test-1",
+  chainId: "minitia-fun-v2-1",
   vm: "move" as const,
   denom: "umin",
   displayDenom: "MIN",
